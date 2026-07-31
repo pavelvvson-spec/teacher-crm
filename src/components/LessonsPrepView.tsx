@@ -3,22 +3,23 @@
 import { useState } from "react";
 import { formatTime } from "@/lib/calendar-utils";
 
-type Lesson = {
-  id: string;
-  startAt: string;
-  duration: number;
-  student: { firstName: string; lastName: string | null };
-};
-
 type Material = {
   id: string;
   type: string;
   title: string;
   url: string;
-  createdAt: string;
+};
+
+type Lesson = {
+  id: string;
+  startAt: string;
+  duration: number;
+  student: { firstName: string; lastName: string | null };
+  materials: Material[];
 };
 
 export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
+  const [lessonsState, setLessonsState] = useState<Lesson[]>(lessons);
   const [openLessonId, setOpenLessonId] = useState<string | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
@@ -33,10 +34,18 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     IMAGE: "Скріншот",
   };
 
-  async function loadMaterials(lessonId: string) {
-    setMaterialsLoading(true);
+  async function refreshLessonMaterials(lessonId: string) {
     const res = await fetch(`/api/lessons/${lessonId}/materials`);
     const data = await res.json();
+    setLessonsState((prev) =>
+      prev.map((l) => (l.id === lessonId ? { ...l, materials: data } : l))
+    );
+    return data;
+  }
+
+  async function loadMaterials(lessonId: string) {
+    setMaterialsLoading(true);
+    const data = await refreshLessonMaterials(lessonId);
     setMaterials(data);
     setMaterialsLoading(false);
   }
@@ -91,7 +100,7 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
   }
 
   const grouped: Record<string, Lesson[]> = {};
-  for (const lesson of lessons) {
+  for (const lesson of lessonsState) {
     const dayKey = new Date(lesson.startAt).toLocaleDateString("uk-UA", {
       weekday: "long",
       day: "numeric",
@@ -101,11 +110,11 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     grouped[dayKey].push(lesson);
   }
 
-  const openLesson_ = lessons.find((l) => l.id === openLessonId) || null;
+  const openLesson_ = lessonsState.find((l) => l.id === openLessonId) || null;
 
   return (
     <div className="space-y-6">
-      {lessons.length === 0 ? (
+      {lessonsState.length === 0 ? (
         <p className="text-gray-500">На найближчий тиждень запланованих уроків немає.</p>
       ) : (
         Object.entries(grouped).map(([day, dayLessons]) => (
@@ -113,21 +122,38 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
             <h2 className="text-lg font-semibold text-gray-800 mb-3 capitalize">{day}</h2>
             <div className="divide-y divide-gray-100">
               {dayLessons.map((lesson) => (
-                <div key={lesson.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="font-medium text-gray-800">
-                      {lesson.student.firstName} {lesson.student.lastName ?? ""}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatTime(new Date(lesson.startAt))} · {lesson.duration} хв
-                    </p>
+                <div key={lesson.id} className="py-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {lesson.student.firstName} {lesson.student.lastName ?? ""}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {formatTime(new Date(lesson.startAt))} · {lesson.duration} хв
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => openLesson(lesson.id)}
+                      className="px-4 py-2 bg-pink-50 text-pink-700 rounded-xl text-sm font-medium hover:bg-pink-100"
+                    >
+                      Підготувати урок
+                    </button>
                   </div>
-                  <button
-                    onClick={() => openLesson(lesson.id)}
-                    className="px-4 py-2 bg-pink-50 text-pink-700 rounded-xl text-sm font-medium hover:bg-pink-100"
-                  >
-                    Підготувати урок
-                  </button>
+                  {lesson.materials.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {lesson.materials.map((m) => (
+                        
+                         <a key={m.id}
+                          href={m.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-1 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100"
+                        >
+                          {materialTypeLabels[m.type] || m.type}: {m.title}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -237,6 +263,6 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
           </div>
         </div>
       )}
-      </div>
+    </div>
   );
 }

@@ -12,7 +12,7 @@ export default async function LessonsPage() {
       startAt: { gte: now, lte: weekAhead },
       status: "SCHEDULED",
     },
-    include: { student: true },
+    include: { student: true, materials: true },
     orderBy: { startAt: "asc" },
   });
 
@@ -25,6 +25,12 @@ export default async function LessonsPage() {
           startAt: l.startAt.toISOString(),
           duration: l.duration,
           student: { firstName: l.student.firstName, lastName: l.student.lastName },
+          materials: l.materials.map((m: typeof l.materials[number]) => ({
+            id: m.id,
+            type: m.type,
+            title: m.title,
+            url: m.url,
+          })),
         }))}
       />
     </div>
