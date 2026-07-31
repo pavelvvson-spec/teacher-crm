@@ -114,34 +114,27 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setCurrentDate(new Date());
   }
 
-  async function markCompleted(lesson: Lesson) {
-    await fetch(`/api/lessons/${lesson.id}`, {
+  async function updateLessonFields(lesson: Lesson, fields: Record<string, string>) {
+    const res = await fetch(`/api/lessons/${lesson.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "COMPLETED" }),
+      body: JSON.stringify(fields),
     });
-    setSelectedLesson(null);
-    loadLessons();
+    if (res.ok) {
+      const updated = { ...lesson, ...fields };
+      setSelectedLesson(updated);
+      setLessons((prev) => prev.map((l) => (l.id === lesson.id ? { ...l, ...fields } : l)));
+    }
   }
 
-  async function markStatus(lesson: Lesson, status: string) {
-    await fetch(`/api/lessons/${lesson.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setSelectedLesson(null);
-    loadLessons();
+  async function toggleStatus(lesson: Lesson, status: string) {
+    const newStatus = lesson.status === status ? "SCHEDULED" : status;
+    await updateLessonFields(lesson, { status: newStatus });
   }
 
-  async function markPaid(lesson: Lesson) {
-    await fetch(`/api/lessons/${lesson.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentStatus: "PAID" }),
-    });
-    setSelectedLesson(null);
-    loadLessons();
+  async function togglePaid(lesson: Lesson) {
+    const newPaymentStatus = lesson.paymentStatus === "PAID" ? "UNPAID" : "PAID";
+    await updateLessonFields(lesson, { paymentStatus: newPaymentStatus });
   }
 
   async function cancelLesson(lesson: Lesson) {
@@ -223,7 +216,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadMaterials(selectedLesson.id);
   }
 
- async function uploadFileMaterial(file: File) {
+  async function uploadFileMaterial(file: File) {
     if (!selectedLesson) return;
     setUploading(true);
     const formData = new FormData();
@@ -473,20 +466,32 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 Підготувати урок
               </button>
               <button
-                onClick={() => markCompleted(selectedLesson)}
-                className="px-4 py-2 bg-green-50 text-green-700 rounded-xl text-sm font-medium hover:bg-green-100"
+                onClick={() => toggleStatus(selectedLesson, "COMPLETED")}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
+                  selectedLesson.status === "COMPLETED"
+                    ? "bg-green-600 text-white border-green-600"
+                    : "bg-green-50 text-green-700 border-transparent hover:bg-green-100"
+                }`}
               >
                 Проведено
               </button>
               <button
-                onClick={() => markStatus(selectedLesson, "NO_SHOW")}
-                className="px-4 py-2 bg-red-50 text-red-700 rounded-xl text-sm font-medium hover:bg-red-100"
+                onClick={() => toggleStatus(selectedLesson, "NO_SHOW")}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
+                  selectedLesson.status === "NO_SHOW"
+                    ? "bg-red-600 text-white border-red-600"
+                    : "bg-red-50 text-red-700 border-transparent hover:bg-red-100"
+                }`}
               >
                 Учень не прийшов
               </button>
               <button
-                onClick={() => markPaid(selectedLesson)}
-                className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium hover:bg-blue-100"
+                onClick={() => togglePaid(selectedLesson)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
+                  selectedLesson.paymentStatus === "PAID"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-blue-50 text-blue-700 border-transparent hover:bg-blue-100"
+                }`}
               >
                 Позначити оплаченим
               </button>

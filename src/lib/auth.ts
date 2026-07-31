@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
-const SESSION_DURATION = 60 * 60 * 24 * 30; // 30 днів у секундах
+const DEFAULT_SESSION_DURATION = 60 * 60 * 24 * 30; // 30 днів у секундах
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -12,11 +12,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export async function createSessionToken(userId: string): Promise<string> {
+export async function createSessionToken(userId: string, durationSeconds?: number): Promise<string> {
+  const duration = durationSeconds ?? DEFAULT_SESSION_DURATION;
   return new SignJWT({ userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_DURATION}s`)
+    .setExpirationTime(`${duration}s`)
     .sign(JWT_SECRET);
 }
 
@@ -30,4 +31,4 @@ export async function verifySessionToken(token: string): Promise<{ userId: strin
 }
 
 export const SESSION_COOKIE_NAME = "session";
-export const SESSION_MAX_AGE = SESSION_DURATION;
+export const SESSION_MAX_AGE = DEFAULT_SESSION_DURATION;

@@ -4,8 +4,10 @@ import {
   verifyPassword,
   createSessionToken,
   SESSION_COOKIE_NAME,
-  SESSION_MAX_AGE,
 } from "@/lib/auth";
+
+const SHORT_SESSION = 60 * 60 * 24 * 7; // 7 днів
+const LONG_SESSION = 60 * 60 * 24 * 90; // 90 днів
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -24,13 +26,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Невірний email або пароль" }, { status: 401 });
   }
 
-  const token = await createSessionToken(user.id);
+  const maxAge = body.rememberMe ? LONG_SESSION : SHORT_SESSION;
+
+  const token = await createSessionToken(user.id, maxAge);
   const response = NextResponse.json({ success: true });
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: SESSION_MAX_AGE,
+    maxAge,
     path: "/",
   });
 
