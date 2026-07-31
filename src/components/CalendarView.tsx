@@ -268,7 +268,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
   }
 
   const statusColors: Record<string, string> = {
-    SCHEDULED: "bg-blue-100 text-blue-800",
+    SCHEDULED: "bg-pink-100 text-pink-800",
     COMPLETED: "bg-green-100 text-green-800",
     CANCELLED_BY_STUDENT: "bg-gray-100 text-gray-500",
     CANCELLED_BY_TEACHER: "bg-gray-100 text-gray-500",
@@ -284,7 +284,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
               key={mode}
               onClick={() => setViewMode(mode)}
               className={`px-4 py-2 rounded-xl font-medium ${
-                viewMode === mode ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"
+                viewMode === mode ? "bg-pink-600 text-white" : "bg-gray-100 text-gray-700"
               }`}
             >
               {mode === "day" ? "День" : mode === "week" ? "Тиждень" : "Місяць"}
@@ -304,7 +304,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="px-5 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700"
+          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
         >
           + Створити урок
         </button>
@@ -327,7 +327,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
               <div
                 key={day.toISOString()}
                 className={`bg-white rounded-2xl shadow-sm p-3 min-h-[100px] ${
-                  isToday ? "ring-2 ring-blue-400" : ""
+                  isToday ? "ring-2 ring-pink-400" : ""
                 }`}
               >
                 <p className="text-sm font-medium text-gray-500 mb-2">{formatDayLabel(day)}</p>
@@ -362,7 +362,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
             {students.length === 0 ? (
               <p className="text-gray-500">
                 Спочатку додай учня на сторінці{" "}
-                <Link href="/students/new" className="text-blue-600 underline">
+                <Link href="/students/new" className="text-pink-600 underline">
                   Учні
                 </Link>
                 .
@@ -452,7 +452,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 <a href={selectedLesson.meetingLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 underline text-sm block"
+                className="text-pink-600 underline text-sm block"
               >
                 Посилання на урок
               </a>
@@ -489,8 +489,8 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 onClick={() => togglePaid(selectedLesson)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
                   selectedLesson.paymentStatus === "PAID"
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-blue-50 text-blue-700 border-transparent hover:bg-blue-100"
+                    ? "bg-pink-600 text-white border-pink-600"
+                    : "bg-pink-50 text-pink-700 border-transparent hover:bg-pink-100"
                 }`}
               >
                 Позначити оплаченим
@@ -560,7 +560,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
                         <a href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline text-sm break-all"
+                        className="text-pink-600 underline text-sm break-all"
                       >
                         {m.title}
                       </a>

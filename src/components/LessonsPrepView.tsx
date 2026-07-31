@@ -200,7 +200,7 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                         <a href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 underline text-sm break-all"
+                        className="text-pink-600 underline text-sm break-all"
                       >
                         {m.title}
                       </a>

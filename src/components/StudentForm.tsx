@@ -92,7 +92,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             required
             value={values.firstName}
             onChange={(e) => setValues({ ...values, firstName: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -100,7 +100,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           <input
             value={values.lastName}
             onChange={(e) => setValues({ ...values, lastName: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -108,7 +108,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           <input
             value={values.phone}
             onChange={(e) => setValues({ ...values, phone: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -117,7 +117,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             value={values.telegramUsername}
             onChange={(e) => setValues({ ...values, telegramUsername: e.target.value })}
             placeholder="@username"
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -125,7 +125,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           <select
             value={values.englishLevel}
             onChange={(e) => setValues({ ...values, englishLevel: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           >
             {ENGLISH_LEVELS.map((level) => (
               <option key={level} value={level}>{level}</option>
@@ -137,7 +137,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           <select
             value={values.lessonFormat}
             onChange={(e) => setValues({ ...values, lessonFormat: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           >
             <option value="ONLINE">Онлайн</option>
             <option value="OFFLINE">Офлайн</option>
@@ -150,7 +150,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             min={1}
             value={values.defaultLessonDuration}
             onChange={(e) => setValues({ ...values, defaultLessonDuration: Number(e.target.value) })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -160,7 +160,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             min={0}
             value={values.defaultLessonPrice}
             onChange={(e) => setValues({ ...values, defaultLessonPrice: Number(e.target.value) })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -168,7 +168,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           <select
             value={values.paymentFrequency}
             onChange={(e) => setValues({ ...values, paymentFrequency: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           >
             {Object.entries(PAYMENT_FREQUENCY_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
@@ -183,7 +183,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           value={values.notes}
           onChange={(e) => setValues({ ...values, notes: e.target.value })}
           rows={3}
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
         />
       </div>
 
@@ -204,7 +204,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50"
+          className="px-6 py-3 bg-pink-600 text-white font-medium rounded-xl hover:bg-pink-700 disabled:opacity-50"
         >
           {loading ? "Збереження..." : "Зберегти"}
         </button>

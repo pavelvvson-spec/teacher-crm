@@ -101,7 +101,7 @@ export default function StudentScheduleManager({
         <button
           type="button"
           onClick={() => setShowAddForm((v) => !v)}
-          className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium hover:bg-blue-100"
+          className="px-4 py-2 bg-pink-50 text-pink-700 rounded-xl text-sm font-medium hover:bg-pink-100"
         >
           {showAddForm ? "Скасувати" : "+ Додати день"}
         </button>
@@ -141,7 +141,7 @@ export default function StudentScheduleManager({
               <select
                 value={newDay}
                 onChange={(e) => setNewDay(Number(e.target.value))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
               >
                 {DAYS_OF_WEEK.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
@@ -154,7 +154,7 @@ export default function StudentScheduleManager({
                 type="time"
                 value={newTime}
                 onChange={(e) => setNewTime(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
               />
             </div>
           </div>
@@ -165,7 +165,7 @@ export default function StudentScheduleManager({
             type="button"
             onClick={handleAdd}
             disabled={saving}
-            className="px-5 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700 disabled:opacity-50"
           >
             {saving ? "Збереження..." : "Зберегти день"}
           </button>

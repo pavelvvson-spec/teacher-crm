@@ -65,7 +65,7 @@ export default async function PaymentsPage() {
                 <p className="font-medium text-gray-800">
                   {s.firstName} {s.lastName ?? ""}
                 </p>
-                <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-blue-600"}`}>
+                <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
                   {s.balance > 0 ? `Борг: ${s.balance} грн` : `Передоплата: ${Math.abs(s.balance)} грн`}
                 </p>
               </div>

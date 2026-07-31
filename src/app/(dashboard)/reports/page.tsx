@@ -59,7 +59,7 @@ export default async function ReportsPage({
             type="date"
             name="from"
             defaultValue={fromStr}
-            className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -68,12 +68,12 @@ export default async function ReportsPage({
             type="date"
             name="to"
             defaultValue={toStr}
-            className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <button
           type="submit"
-          className="px-5 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700"
+          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
         >
           Показати
         </button>

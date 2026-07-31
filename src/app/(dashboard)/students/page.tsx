@@ -6,17 +6,24 @@ export const dynamic = "force-dynamic";
 export default async function StudentsPage() {
   const students = await prisma.student.findMany({ orderBy: { firstName: "asc" } });
 
+  const activeCount = students.filter((s: typeof students[number]) => s.isActive).length;
+  const inactiveCount = students.length - activeCount;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">Учні</h1>
         <Link
           href="/students/new"
-          className="px-5 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700"
+          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
         >
           + Додати учня
         </Link>
       </div>
+
+      <p className="text-sm text-gray-500">
+        Всього: {students.length} · Активних: {activeCount} · Неактивних: {inactiveCount}
+      </p>
 
       {students.length === 0 ? (
         <p className="text-gray-500">Учнів ще немає. Додай першого!</p>

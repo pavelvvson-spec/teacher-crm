@@ -137,7 +137,7 @@ export default function LessonForm({
           type="button"
           onClick={() => setMode("single")}
           className={`px-4 py-2 rounded-xl font-medium ${
-            mode === "single" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"
+            mode === "single" ? "bg-pink-600 text-white" : "bg-gray-100 text-gray-700"
           }`}
         >
           Одноразовий урок
@@ -146,7 +146,7 @@ export default function LessonForm({
           type="button"
           onClick={() => setMode("recurring")}
           className={`px-4 py-2 rounded-xl font-medium ${
-            mode === "recurring" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700"
+            mode === "recurring" ? "bg-pink-600 text-white" : "bg-gray-100 text-gray-700"
           }`}
         >
           Регулярні заняття
@@ -158,7 +158,7 @@ export default function LessonForm({
         <select
           value={studentId}
           onChange={(e) => handleStudentChange(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
         >
           {students.map((s) => (
             <option key={s.id} value={s.id}>
@@ -177,7 +177,7 @@ export default function LessonForm({
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -186,7 +186,7 @@ export default function LessonForm({
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
       </div>
@@ -202,7 +202,7 @@ export default function LessonForm({
                 onClick={() => toggleDay(d.value)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium ${
                   selectedDays.includes(d.value)
-                    ? "bg-blue-600 text-white"
+                    ? "bg-pink-600 text-white"
                     : "bg-gray-100 text-gray-700"
                 }`}
               >
@@ -221,7 +221,7 @@ export default function LessonForm({
             min={1}
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
         <div>
@@ -231,7 +231,7 @@ export default function LessonForm({
             min={0}
             value={price}
             onChange={(e) => setPrice(Number(e.target.value))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
       </div>
@@ -241,7 +241,7 @@ export default function LessonForm({
         <select
           value={format}
           onChange={(e) => setFormat(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
         >
           <option value="ONLINE">Онлайн</option>
           <option value="OFFLINE">Офлайн</option>
@@ -257,7 +257,7 @@ export default function LessonForm({
             value={meetingLink}
             onChange={(e) => setMeetingLink(e.target.value)}
             placeholder="https://..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
       )}
@@ -267,7 +267,7 @@ export default function LessonForm({
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50"
+        className="w-full py-3 bg-pink-600 text-white font-medium rounded-xl hover:bg-pink-700 disabled:opacity-50"
       >
         {loading ? "Збереження..." : "Створити"}
       </button>

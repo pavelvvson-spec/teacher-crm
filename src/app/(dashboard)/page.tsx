@@ -10,7 +10,7 @@ export default function HomePage() {
       <div className="flex gap-3">
         <Link
           href="/students/new"
-          className="px-5 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700"
+          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
         >
           Додати учня
         </Link>
