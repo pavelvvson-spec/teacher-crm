@@ -222,9 +222,16 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
               />
               {uploading && <p className="text-gray-400 text-sm">Завантаження файлу...</p>}
             </div>
+
+            <button
+              onClick={() => setOpenLessonId(null)}
+              className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
+            >
+              Готово
+            </button>
           </div>
         </div>
       )}
-    </div>
+      </div>
   );
 }
