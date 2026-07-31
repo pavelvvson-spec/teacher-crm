@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { LessonStatus } from "@prisma/client";
+
+type LessonStatus =
+  | "SCHEDULED"
+  | "COMPLETED"
+  | "CANCELLED_BY_STUDENT"
+  | "CANCELLED_BY_TEACHER"
+  | "RESCHEDULED"
+  | "NO_SHOW";
 
 const ACTIVE_STATUSES: LessonStatus[] = ["SCHEDULED", "RESCHEDULED", "COMPLETED"];
 
