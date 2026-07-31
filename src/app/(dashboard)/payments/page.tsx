@@ -15,12 +15,12 @@ export default async function PaymentsPage() {
       lastName: student.lastName,
       balance: calculateStudentBalance(student.lessons),
     }))
-    .filter((s) => s.balance !== 0)
-    .sort((a, b) => b.balance - a.balance);
+    .filter((s: { balance: number }) => s.balance !== 0)
+    .sort((a: { balance: number }, b: { balance: number }) => b.balance - a.balance);
 
   const totalDebt = studentsWithBalance
-    .filter((s) => s.balance > 0)
-    .reduce((sum, s) => sum + s.balance, 0);
+    .filter((s: { balance: number }) => s.balance > 0)
+    .reduce((sum: number, s: { balance: number }) => sum + s.balance, 0);
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -33,7 +33,7 @@ export default async function PaymentsPage() {
     },
   });
 
-  const monthIncome = monthLessons.reduce((sum, l) => sum + l.price, 0);
+  const monthIncome = monthLessons.reduce((sum: number, l: typeof monthLessons[number]) => sum + l.price, 0);
 
   
 
@@ -58,7 +58,7 @@ export default async function PaymentsPage() {
           <p className="text-gray-500">Боргів немає — усе оплачено.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {studentsWithBalance.map((s) => (
+            {studentsWithBalance.map((s: typeof studentsWithBalance[number]) => (
               <div key={s.id} className="flex items-center justify-between py-3">
                 <p className="font-medium text-gray-800">
                   {s.firstName} {s.lastName ?? ""}
