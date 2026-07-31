@@ -1,0 +1,171 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // на продакшн замінити на "postgresql"
+ 
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum EnglishLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum LessonFormat {
+  ONLINE
+  OFFLINE
+}
+
+model Student {
+  id                    String    @id @default(cuid())
+  firstName             String
+  lastName              String?
+  phone                 String?
+  telegramUsername      String?
+  telegramChatId        String?
+  englishLevel          EnglishLevel
+  lessonFormat          LessonFormat
+  defaultLessonDuration Int       // у хвилинах
+  defaultLessonPrice    Float
+  notes                 String?
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  lessons             Lesson[]
+  payments            Payment[]
+  reminders           Reminder[]
+  recurringSchedules  RecurringSchedule[]
+}
+
+enum LessonStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED_BY_STUDENT
+  CANCELLED_BY_TEACHER
+  RESCHEDULED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  PARTIALLY_PAID
+  DEBT
+  PREPAID
+}
+
+model Lesson {
+  id                 String       @id @default(cuid())
+  studentId          String
+  student            Student      @relation(fields: [studentId], references: [id])
+  startAt            DateTime
+  endAt              DateTime
+  duration           Int
+  format             LessonFormat
+  meetingLink        String?
+  status             LessonStatus @default(SCHEDULED)
+  price              Float
+  paymentStatus      PaymentStatus @default(UNPAID)
+  teacherNotes       String?
+  cancellationReason String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  payments  Payment[]
+  reminders Reminder[]
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  studentId     String
+  student       Student       @relation(fields: [studentId], references: [id])
+  lessonId      String?
+  lesson        Lesson?       @relation(fields: [lessonId], references: [id])
+  amount        Float
+  status        PaymentStatus @default(UNPAID)
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+  comment       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+enum ReminderType {
+  H24
+  H2
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Reminder {
+  id                String         @id @default(cuid())
+  lessonId          String
+  lesson            Lesson         @relation(fields: [lessonId], references: [id])
+  studentId         String
+  student           Student        @relation(fields: [studentId], references: [id])
+  reminderType      ReminderType
+  scheduledAt       DateTime
+  sentAt            DateTime?
+  status            ReminderStatus @default(PENDING)
+  errorMessage      String?
+  telegramMessageId String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model RecurringSchedule {
+  id          String       @id @default(cuid())
+  studentId   String
+  student     Student      @relation(fields: [studentId], references: [id])
+  dayOfWeek   Int          // 0 = неділя ... 6 = субота
+  startTime   String       // "17:00"
+  duration    Int
+  format      LessonFormat
+  price       Float
+  activeFrom  DateTime
+  activeUntil DateTime?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Settings {
+  id                        String   @id @default(cuid())
+  teacherName               String
+  telegramBotToken          String?
+  defaultReminder24hEnabled Boolean  @default(true)
+  defaultReminder2hEnabled  Boolean  @default(true)
+  timezone                  String   @default("Europe/Kyiv")
+  currency                  String   @default("UAH")
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+}
