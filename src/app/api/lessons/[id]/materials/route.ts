@@ -34,6 +34,7 @@ export async function POST(
 
     const blob = await put(`lessons/${id}/${Date.now()}-${file.name}`, file, {
       access: "public",
+      token: process.env.BLOB2_READ_WRITE_TOKEN,
     });
 
     const type = file.type.includes("pdf") ? "PDF" : "IMAGE";
@@ -80,7 +81,7 @@ export async function DELETE(request: NextRequest) {
   });
 
   if (material && (material.type === "PDF" || material.type === "IMAGE")) {
-    await del(material.url).catch(() => null);
+    await del(material.url, { token: process.env.BLOB2_READ_WRITE_TOKEN }).catch(() => null);
   }
 
   await prisma.lessonMaterial.delete({ where: { id: body.materialId } });
