@@ -223,17 +223,22 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadMaterials(selectedLesson.id);
   }
 
-  async function uploadFileMaterial(file: File) {
+ async function uploadFileMaterial(file: File) {
     if (!selectedLesson) return;
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", file.name);
-    await fetch(`/api/lessons/${selectedLesson.id}/materials`, {
+    const res = await fetch(`/api/lessons/${selectedLesson.id}/materials`, {
       method: "POST",
       body: formData,
     });
     setUploading(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert("Помилка завантаження: " + (data.error || res.status));
+      return;
+    }
     loadMaterials(selectedLesson.id);
   }
 
@@ -603,6 +608,16 @@ export default function CalendarView({ students }: { students: Student[] }) {
               />
               {uploading && <p className="text-gray-400 text-sm">Завантаження файлу...</p>}
             </div>
+
+            <button
+              onClick={() => {
+                setShowMaterials(false);
+                setSelectedLesson(null);
+              }}
+              className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
+            >
+              Готово
+            </button>
           </div>
         </div>
       )}

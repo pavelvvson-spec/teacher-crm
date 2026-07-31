@@ -66,11 +66,16 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", file.name);
-    await fetch(`/api/lessons/${openLessonId}/materials`, {
+    const res = await fetch(`/api/lessons/${openLessonId}/materials`, {
       method: "POST",
       body: formData,
     });
     setUploading(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert("Помилка завантаження: " + (data.error || res.status));
+      return;
+    }
     loadMaterials(openLessonId);
   }
 
