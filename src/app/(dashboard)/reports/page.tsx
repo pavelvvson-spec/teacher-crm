@@ -22,10 +22,10 @@ export default async function ReportsPage({
     include: { student: true },
   });
 
-  const totalAmount = lessons.reduce((sum, l) => sum + l.price, 0);
+  const totalAmount = lessons.reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
   const paidAmount = lessons
-    .filter((l) => l.paymentStatus === "PAID")
-    .reduce((sum, l) => sum + l.price, 0);
+    .filter((l: typeof lessons[number]) => l.paymentStatus === "PAID")
+    .reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
   const unpaidAmount = totalAmount - paidAmount;
 
   const debtorsMap = new Map<string, { name: string; amount: number }>();
