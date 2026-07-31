@@ -9,7 +9,7 @@ export default async function PaymentsPage() {
   });
 
   const studentsWithBalance = students
-    .map((student) => ({
+    .map((student: typeof students[number]) => ({
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
