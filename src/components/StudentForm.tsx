@@ -13,11 +13,20 @@ type StudentFormValues = {
   lessonFormat: string;
   defaultLessonDuration: number;
   defaultLessonPrice: number;
+  paymentFrequency: string;
   notes: string;
   isActive: boolean;
 };
 
 const ENGLISH_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+const PAYMENT_FREQUENCY_LABELS: Record<string, string> = {
+  PER_LESSON: "Поурочна",
+  WEEKLY: "Щотижнева",
+  MONTHLY: "Щомісячна",
+  END_OF_WEEK: "В кінці тижня",
+  END_OF_MONTH: "В кінці місяця",
+};
 
 export default function StudentForm({ initialValues }: { initialValues?: Partial<StudentFormValues> }) {
   const router = useRouter();
@@ -32,6 +41,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
     lessonFormat: initialValues?.lessonFormat ?? "ONLINE",
     defaultLessonDuration: initialValues?.defaultLessonDuration ?? 60,
     defaultLessonPrice: initialValues?.defaultLessonPrice ?? 300,
+    paymentFrequency: initialValues?.paymentFrequency ?? "PER_LESSON",
     notes: initialValues?.notes ?? "",
     isActive: initialValues?.isActive ?? true,
   });
@@ -152,6 +162,18 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             onChange={(e) => setValues({ ...values, defaultLessonPrice: Number(e.target.value) })}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Тип оплати</label>
+          <select
+            value={values.paymentFrequency}
+            onChange={(e) => setValues({ ...values, paymentFrequency: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {Object.entries(PAYMENT_FREQUENCY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
         </div>
       </div>
 

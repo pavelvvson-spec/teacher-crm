@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       lessonFormat: body.lessonFormat,
       defaultLessonDuration: Number(body.defaultLessonDuration) || 60,
       defaultLessonPrice: Number(body.defaultLessonPrice) || 0,
+      paymentFrequency: body.paymentFrequency || null,
       notes: body.notes || null,
     },
   });

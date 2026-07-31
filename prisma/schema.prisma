@@ -32,6 +32,14 @@ enum LessonFormat {
   OFFLINE
 }
 
+enum PaymentFrequency {
+  PER_LESSON
+  WEEKLY
+  MONTHLY
+  END_OF_WEEK
+  END_OF_MONTH
+}
+
 model Student {
   id                    String    @id @default(cuid())
   firstName             String
@@ -43,6 +51,7 @@ model Student {
   lessonFormat          LessonFormat
   defaultLessonDuration Int       // у хвилинах
   defaultLessonPrice    Float
+  paymentFrequency      PaymentFrequency?
   notes                 String?
   isActive              Boolean   @default(true)
   createdAt             DateTime  @default(now())

@@ -23,6 +23,7 @@ export async function PUT(
       lessonFormat: body.lessonFormat,
       defaultLessonDuration: Number(body.defaultLessonDuration) || 60,
       defaultLessonPrice: Number(body.defaultLessonPrice) || 0,
+      paymentFrequency: body.paymentFrequency || null,
       notes: body.notes || null,
       isActive: body.isActive ?? true,
     },
