@@ -5,7 +5,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Головна" },
   { href: "/calendar", label: "Календар" },
   { href: "/students", label: "Учні" },
-  { href: "/lessons", label: "Уроки" },
+  { href: "/lessons", label: "Підготовка до уроку" },
   { href: "/payments", label: "Оплати" },
   { href: "/reports", label: "Звіти" },
   { href: "/settings/telegram", label: "Telegram" },
