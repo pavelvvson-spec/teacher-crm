@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { calculateStudentBalance } from "@/lib/payments-utils";
 
+export const dynamic = "force-dynamic";
+
 export default async function PaymentsPage() {
   const students = await prisma.student.findMany({
     where: { isActive: true },

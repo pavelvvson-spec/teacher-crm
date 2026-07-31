@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function TelegramSettingsPage() {
   const students = await prisma.student.findMany({
     where: { isActive: true },
@@ -32,7 +34,7 @@ export default async function TelegramSettingsPage() {
       <div className="bg-white rounded-2xl shadow-sm p-5">
         <h2 className="text-lg font-semibold text-gray-800 mb-3">Статус учнів</h2>
         <div className="divide-y divide-gray-100">
-          {students.map((student) => (
+          {students.map((student: typeof students[number]) => (
             <div key={student.id} className="flex items-center justify-between py-3">
               <div>
                 <p className="font-medium text-gray-800">
@@ -62,7 +64,7 @@ export default async function TelegramSettingsPage() {
           <p className="text-gray-500">Нагадувань ще не надсилалось.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {recentReminders.map((reminder) => (
+            {recentReminders.map((reminder: typeof recentReminders[number]) => (
               <div key={reminder.id} className="flex items-center justify-between py-3">
                 <div>
                   <p className="font-medium text-gray-800">

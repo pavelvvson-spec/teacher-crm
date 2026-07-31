@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function StudentsPage() {
   const students = await prisma.student.findMany({ orderBy: { firstName: "asc" } });
 
@@ -20,7 +22,7 @@ export default async function StudentsPage() {
         <p className="text-gray-500">Учнів ще немає. Додай першого!</p>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100">
-          {students.map((student) => (
+          {students.map((student: typeof students[number]) => (
             <Link
               key={student.id}
               href={`/students/${student.id}`}

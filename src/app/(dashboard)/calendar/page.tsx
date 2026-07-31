@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import CalendarView from "@/components/CalendarView";
 
+export const dynamic = "force-dynamic";
+
 export default async function CalendarPage() {
   const students = await prisma.student.findMany({
     where: { isActive: true },
