@@ -13,7 +13,7 @@ const NAV_ITEMS = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <header className="bg-white border-b border-gray-200">
         <nav className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-between">
           <div className="flex flex-wrap gap-1">
