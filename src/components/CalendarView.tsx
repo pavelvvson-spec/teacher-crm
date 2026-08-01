@@ -66,6 +66,8 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [newLinkTitle, setNewLinkTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   const getRange = useCallback(() => {
     if (viewMode === "day") {
@@ -201,7 +203,15 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setShowMaterials(true);
     setNewLinkTitle("");
     setNewLinkUrl("");
+    setNoteText(lesson.teacherNotes || "");
     loadMaterials(lesson.id);
+  }
+
+  async function saveNote() {
+    if (!selectedLesson) return;
+    setSavingNote(true);
+    await updateLessonFields(selectedLesson, { teacherNotes: noteText });
+    setSavingNote(false);
   }
 
   async function addLinkMaterial() {
@@ -342,6 +352,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
                       <p className="truncate">
                         {lesson.student.firstName} {lesson.student.lastName ?? ""}
                       </p>
+                      {lesson.teacherNotes && (
+                        <p className="truncate italic text-[11px] opacity-80">
+                          📝 {lesson.teacherNotes}
+                        </p>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -412,6 +427,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
               Оплата:{" "}
               <span className="font-medium">{PAYMENT_STATUS_LABELS[selectedLesson.paymentStatus]}</span>
             </p>
+            {selectedLesson.teacherNotes && (
+              <p className="text-sm bg-pink-50 text-pink-700 rounded-lg px-3 py-2">
+                📝 {selectedLesson.teacherNotes}
+              </p>
+            )}
 
             {reschedulingLesson && reschedulingLesson.id === selectedLesson.id && (
               <div className="bg-yellow-50 rounded-xl p-4 space-y-3">
@@ -448,8 +468,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
             )}
 
             {selectedLesson.meetingLink && (
-              
-                <a href={selectedLesson.meetingLink}
+              <a href={selectedLesson.meetingLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-pink-600 underline text-sm block"
@@ -541,6 +560,24 @@ export default function CalendarView({ students }: { students: Student[] }) {
               </button>
             </div>
 
+            <div className="border-b border-gray-100 pb-4 space-y-2">
+              <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Наприклад: не забути перевірити знання слів, перевірити дз..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <button
+                onClick={saveNote}
+                disabled={savingNote}
+                className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50"
+              >
+                {savingNote ? "Збереження..." : "Зберегти нотатку"}
+              </button>
+            </div>
+
             <div className="space-y-2">
               {materialsLoading ? (
                 <p className="text-gray-400 text-sm">Завантаження...</p>
@@ -556,8 +593,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
                       <p className="text-xs text-pink-600 font-medium">
                         {materialTypeLabels[m.type] || m.type}
                       </p>
-                      
-                        <a href={m.url}
+                      <a href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-pink-600 underline text-sm break-all"
