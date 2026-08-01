@@ -14,6 +14,7 @@ type Lesson = {
   id: string;
   startAt: string;
   duration: number;
+  teacherNotes: string | null;
   student: { firstName: string; lastName: string | null };
   materials: Material[];
 };
@@ -26,6 +27,8 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
   const [newLinkTitle, setNewLinkTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   const materialTypeLabels: Record<string, string> = {
     LINK: "Посилання",
@@ -54,7 +57,23 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     setOpenLessonId(lessonId);
     setNewLinkTitle("");
     setNewLinkUrl("");
+    const lesson = lessonsState.find((l) => l.id === lessonId);
+    setNoteText(lesson?.teacherNotes || "");
     loadMaterials(lessonId);
+  }
+
+  async function saveNote() {
+    if (!openLessonId) return;
+    setSavingNote(true);
+    await fetch(`/api/lessons/${openLessonId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacherNotes: noteText }),
+    });
+    setLessonsState((prev) =>
+      prev.map((l) => (l.id === openLessonId ? { ...l, teacherNotes: noteText } : l))
+    );
+    setSavingNote(false);
   }
 
   async function addLinkMaterial() {
@@ -131,6 +150,11 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                       <p className="text-sm text-gray-500">
                         {formatTime(new Date(lesson.startAt))} · {lesson.duration} хв
                       </p>
+                      {lesson.teacherNotes && (
+                        <p className="text-xs italic text-pink-600 mt-1">
+                          📝 {lesson.teacherNotes}
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={() => openLesson(lesson.id)}
@@ -142,8 +166,7 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                   {lesson.materials.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {lesson.materials.map((m) => (
-                        
-                         <a key={m.id}
+                        <a key={m.id}
                           href={m.url}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -181,6 +204,24 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
               </button>
             </div>
 
+            <div className="border-b border-gray-100 pb-4 space-y-2">
+              <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Наприклад: не забути перевірити знання слів, перевірити дз..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <button
+                onClick={saveNote}
+                disabled={savingNote}
+                className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50"
+              >
+                {savingNote ? "Збереження..." : "Зберегти нотатку"}
+              </button>
+            </div>
+
             <div className="space-y-2">
               {materialsLoading ? (
                 <p className="text-gray-400 text-sm">Завантаження...</p>
@@ -196,8 +237,7 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                       <p className="text-xs text-pink-600 font-medium">
                         {materialTypeLabels[m.type] || m.type}
                       </p>
-                      
-                        <a href={m.url}
+                      <a href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-pink-600 underline text-sm break-all"
