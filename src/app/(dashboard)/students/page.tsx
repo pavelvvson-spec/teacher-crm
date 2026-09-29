@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import ResetAllStudentsButton from "@/components/ResetAllStudentsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +12,17 @@ export default async function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold text-gray-800">Учні</h1>
-        <Link
-          href="/students/new"
-          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
-        >
-          + Додати учня
-        </Link>
+        <div className="flex items-center gap-2">
+          <ResetAllStudentsButton />
+          <Link
+            href="/students/new"
+            className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
+          >
+            + Додати учня
+          </Link>
+        </div>
       </div>
 
       <p className="text-sm text-gray-500">
