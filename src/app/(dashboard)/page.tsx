@@ -1,62 +1,80 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import ResetAllStudentsButton from "@/components/ResetAllStudentsButton";
+import { calculateStudentBalance } from "@/lib/payments-utils";
+import ResetPaymentsButton from "@/components/ResetPaymentsButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudentsPage() {
-  const students = await prisma.student.findMany({ orderBy: { firstName: "asc" } });
+export default async function PaymentsPage() {
+  const students = await prisma.student.findMany({
+    where: { isActive: true },
+    include: { lessons: true },
+    orderBy: { firstName: "asc" },
+  });
 
-  const activeCount = students.filter((s: typeof students[number]) => s.isActive).length;
-  const inactiveCount = students.length - activeCount;
+  const studentsWithBalance = students
+    .map((student: typeof students[number]) => ({
+      id: student.id,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      balance: calculateStudentBalance(student.lessons),
+    }))
+    .filter((s: { balance: number }) => s.balance !== 0)
+    .sort((a: { balance: number }, b: { balance: number }) => b.balance - a.balance);
+
+  const totalDebt = studentsWithBalance
+    .filter((s: { balance: number }) => s.balance > 0)
+    .reduce((sum: number, s: { balance: number }) => sum + s.balance, 0);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  const monthLessons = await prisma.lesson.findMany({
+    where: {
+      startAt: { gte: monthStart, lte: monthEnd },
+      paymentStatus: "PAID",
+    },
+  });
+
+  const monthIncome = monthLessons.reduce((sum: number, l: typeof monthLessons[number]) => sum + l.price, 0);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold text-gray-800">Учні</h1>
-        <div className="flex items-center gap-2">
-          <ResetAllStudentsButton />
-          <Link
-            href="/students/new"
-            className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
-          >
-            + Додати учня
-          </Link>
+        <h1 className="text-2xl font-semibold text-gray-800">Оплати</h1>
+        <ResetPaymentsButton />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <p className="text-sm text-gray-500">Загальний борг учнів</p>
+          <p className="text-2xl font-semibold text-red-600">{totalDebt} грн</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <p className="text-sm text-gray-500">Зароблено за поточний місяць</p>
+          <p className="text-2xl font-semibold text-green-600">{monthIncome} грн</p>
         </div>
       </div>
 
-      <p className="text-sm text-gray-500">
-        Всього: {students.length} · Активних: {activeCount} · Неактивних: {inactiveCount}
-      </p>
-
-      {students.length === 0 ? (
-        <p className="text-gray-500">Учнів ще немає. Додай першого!</p>
-      ) : (
-        <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100">
-          {students.map((student: typeof students[number]) => (
-            <Link
-              key={student.id}
-              href={`/students/${student.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-gray-50"
-            >
-              <div>
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Хто має неоплачені уроки</h2>
+        {studentsWithBalance.length === 0 ? (
+          <p className="text-gray-500">Боргів немає — усе оплачено.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {studentsWithBalance.map((s: typeof studentsWithBalance[number]) => (
+              <div key={s.id} className="flex items-center justify-between py-3">
                 <p className="font-medium text-gray-800">
-                  {student.firstName} {student.lastName ?? ""}
+                  {s.firstName} {s.lastName ?? ""}
                 </p>
-                <p className="text-sm text-gray-500">
-                  Рівень: {student.englishLevel} ·{" "}
-                  {student.lessonFormat === "ONLINE" ? "Онлайн" : "Офлайн"}
+                <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
+                  {s.balance > 0 ? `Борг: ${s.balance} грн` : `Передоплата: ${Math.abs(s.balance)} грн`}
                 </p>
               </div>
-              {!student.isActive && (
-                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">
-                  Неактивний
-                </span>
-              )}
-            </Link>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
