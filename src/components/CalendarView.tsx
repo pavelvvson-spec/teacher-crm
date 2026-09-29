@@ -146,6 +146,17 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadLessons();
   }
 
+  async function deleteLessonPermanently(lesson: Lesson) {
+    if (!confirm("Видалити цей урок назавжди? Цю дію не можна скасувати.")) return;
+    await fetch(`/api/lessons/${lesson.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hard: true }),
+    });
+    setSelectedLesson(null);
+    loadLessons();
+  }
+
   async function sendReminder(lesson: Lesson) {
     const res = await fetch(`/api/lessons/${lesson.id}/send-reminder`, {
       method: "POST",
@@ -531,6 +542,12 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200"
               >
                 Скасувати урок
+              </button>
+              <button
+                onClick={() => deleteLessonPermanently(selectedLesson)}
+                className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700"
+              >
+                Видалити урок
               </button>
             </div>
           </div>
