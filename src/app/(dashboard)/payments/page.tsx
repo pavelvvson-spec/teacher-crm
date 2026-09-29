@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { calculateStudentBalance } from "@/lib/payments-utils";
+import ResetPaymentsButton from "@/components/ResetPaymentsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +38,12 @@ export default async function PaymentsPage() {
 
   const monthIncome = monthLessons.reduce((sum: number, l: typeof monthLessons[number]) => sum + l.price, 0);
 
-  
-
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-800">Оплати</h1>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-semibold text-gray-800">Оплати</h1>
+        <ResetPaymentsButton />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
