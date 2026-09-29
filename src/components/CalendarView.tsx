@@ -15,6 +15,7 @@ import {
   PAYMENT_STATUS_LABELS,
 } from "@/lib/calendar-utils";
 import LessonForm from "@/components/LessonForm";
+import CalendarResetMenu from "@/components/CalendarResetMenu";
 
 type Student = {
   id: string;
@@ -329,6 +330,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
         >
           + Створити урок
         </button>
+        <CalendarResetMenu onDone={loadLessons} />
       </div>
 
       <p className="text-gray-500 font-medium">{formatMonthYear(currentDate)}</p>
