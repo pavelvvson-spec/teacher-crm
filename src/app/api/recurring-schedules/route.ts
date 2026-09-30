@@ -100,5 +100,57 @@ export async function POST(request: NextRequest) {
     await prisma.lesson.createMany({ data: lessonsToCreate });
   }
 
-  return NextResponse.json({ schedule, lessonsCreated: lessonsToCreate.length }, { status: 201 });
+  // --- Очищення старих уроків, які більше не відповідають жодному активному графіку учня ---
+  const activeSchedules = await prisma.recurringSchedule.findMany({
+    where: { studentId: body.studentId, isActive: true },
+  });
+
+  const matchesAnySchedule = (lessonStartAt: Date) => {
+    const dow = lessonStartAt.getDay();
+    const hh = String(lessonStartAt.getHours()).padStart(2, "0");
+    const mm = String(lessonStartAt.getMinutes()).padStart(2, "0");
+    const timeStr = `${hh}:${mm}`;
+
+    return activeSchedules.some((s) => {
+      if (s.dayOfWeek !== dow) return false;
+      if (s.startTime !== timeStr) return false;
+      if (lessonStartAt < s.activeFrom) return false;
+      if (s.activeUntil && lessonStartAt > s.activeUntil) return false;
+      return true;
+    });
+  };
+
+  const futureLessons = await prisma.lesson.findMany({
+    where: {
+      studentId: body.studentId,
+      status: "SCHEDULED",
+      startAt: { gte: activeFrom },
+    },
+  });
+
+  const staleLessonIds = futureLessons
+    .filter((lesson) => !matchesAnySchedule(lesson.startAt))
+    .map((lesson) => lesson.id);
+
+  let cancelledCount = 0;
+  if (staleLessonIds.length > 0) {
+    await prisma.reminder.updateMany({
+      where: { lessonId: { in: staleLessonIds }, status: "PENDING" },
+      data: { status: "SKIPPED" },
+    });
+
+    const result = await prisma.lesson.updateMany({
+      where: { id: { in: staleLessonIds } },
+      data: {
+        status: "CANCELLED_BY_TEACHER",
+        cancellationReason: "Автоматично скасовано: змінено графік уроків",
+      },
+    });
+    cancelledCount = result.count;
+  }
+
+  return NextResponse.json(
+    { schedule, lessonsCreated: lessonsToCreate.length, lessonsCancelled: cancelledCount },
+    { status: 201 }
+  );
 }
