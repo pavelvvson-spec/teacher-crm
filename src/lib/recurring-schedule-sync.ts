@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson, findExactDuplicateLesson } from "@/lib/lesson-conflict";
+import { kyivWallTimeToUtc, getKyivTimeParts } from "@/lib/kyiv-time";
 
 const WEEKS_AHEAD = 8;
 
@@ -33,8 +34,13 @@ export async function syncStudentLessons(studentId: string, fromDate?: Date) {
 
     for (let i = 0; i < WEEKS_AHEAD * 7; i++) {
       if (cursor.getDay() === schedule.dayOfWeek) {
-        const startAt = new Date(cursor);
-        startAt.setHours(hours, minutes, 0, 0);
+        const startAt = kyivWallTimeToUtc(
+          cursor.getFullYear(),
+          cursor.getMonth(),
+          cursor.getDate(),
+          hours,
+          minutes
+        );
 
         if (startAt >= schedule.activeFrom && (!schedule.activeUntil || startAt <= schedule.activeUntil)) {
           const endAt = new Date(startAt.getTime() + schedule.duration * 60000);
@@ -70,13 +76,11 @@ export async function syncStudentLessons(studentId: string, fromDate?: Date) {
   }
 
   const matchesAnySchedule = (lessonStartAt: Date) => {
-    const dow = lessonStartAt.getDay();
-    const hh = String(lessonStartAt.getHours()).padStart(2, "0");
-    const mm = String(lessonStartAt.getMinutes()).padStart(2, "0");
-    const timeStr = `${hh}:${mm}`;
+    const { hours, minutes, dayOfWeek } = getKyivTimeParts(lessonStartAt);
+    const timeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 
     return activeSchedules.some((s) => {
-      if (s.dayOfWeek !== dow) return false;
+      if (s.dayOfWeek !== dayOfWeek) return false;
       if (s.startTime !== timeStr) return false;
       if (lessonStartAt < s.activeFrom) return false;
       if (s.activeUntil && lessonStartAt > s.activeUntil) return false;

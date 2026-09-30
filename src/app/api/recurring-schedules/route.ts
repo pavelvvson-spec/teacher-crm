@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson } from "@/lib/lesson-conflict";
 import { syncStudentLessons } from "@/lib/recurring-schedule-sync";
+import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 
 const WEEKS_AHEAD = 8;
 
@@ -31,8 +32,13 @@ export async function POST(request: NextRequest) {
 
   for (let i = 0; i < WEEKS_AHEAD * 7; i++) {
     if (cursor.getDay() === Number(body.dayOfWeek)) {
-      const startAt = new Date(cursor);
-      startAt.setHours(hours, minutes, 0, 0);
+      const startAt = kyivWallTimeToUtc(
+        cursor.getFullYear(),
+        cursor.getMonth(),
+        cursor.getDate(),
+        hours,
+        minutes
+      );
 
       if (startAt >= activeFrom) {
         const endAt = new Date(startAt.getTime() + duration * 60000);
@@ -40,7 +46,7 @@ export async function POST(request: NextRequest) {
         if (conflict) {
           return NextResponse.json(
             {
-              error: `Конфлікт часу: ${startAt.toLocaleDateString("uk-UA")} о ${startAt.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} вже є урок з учнем ${conflict.student.firstName}`,
+              error: `Конфлікт часу: ${startAt.toLocaleDateString("uk-UA")} о ${startAt.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Kyiv" })} вже є урок з учнем ${conflict.student.firstName}`,
             },
             { status: 409 }
           );
