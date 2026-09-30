@@ -42,6 +42,7 @@ enum PaymentFrequency {
 
 model Student {
   id                    String    @id @default(cuid())
+  studentNumber          Int       @unique @default(autoincrement())
   firstName             String
   lastName              String?
   phone                 String?

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import StudentForm from "@/components/StudentForm";
 import StudentScheduleManager from "@/components/StudentScheduleManager";
+
 export default async function StudentDetailPage({
   params,
 }: {
@@ -16,9 +17,12 @@ export default async function StudentDetailPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-800">
-        {student.firstName} {student.lastName ?? ""}
-      </h1>
+      <div>
+        <p className="text-sm text-gray-400 font-medium">Учень №{student.studentNumber}</p>
+        <h1 className="text-2xl font-semibold text-gray-800">
+          {student.firstName} {student.lastName ?? ""}
+        </h1>
+      </div>
       <StudentForm
         initialValues={{
           id: student.id,
@@ -30,16 +34,17 @@ export default async function StudentDetailPage({
           lessonFormat: student.lessonFormat,
           defaultLessonDuration: student.defaultLessonDuration,
           defaultLessonPrice: student.defaultLessonPrice,
+          paymentFrequency: student.paymentFrequency ?? "PER_LESSON",
           notes: student.notes ?? "",
           isActive: student.isActive,
         }}
       />
-    <StudentScheduleManager
+      <StudentScheduleManager
         studentId={student.id}
         defaultDuration={student.defaultLessonDuration}
         defaultPrice={student.defaultLessonPrice}
         defaultFormat={student.lessonFormat}
-      /> 
-      </div>
+      />
+    </div>
   );
 }

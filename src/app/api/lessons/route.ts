@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (conflict) {
     return NextResponse.json(
       {
-        error: `На цей час уже є урок з учнем ${conflict.student.firstName} (${conflict.startAt.toLocaleString("uk-UA")})`,
+        error: `На цей час уже є урок з учнем №${conflict.student.studentNumber} ${conflict.student.firstName} (${conflict.startAt.toLocaleString("uk-UA")})`,
       },
       { status: 409 }
     );

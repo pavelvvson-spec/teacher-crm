@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+async function freeUpFutureLessons(studentId: string) {
+  const now = new Date();
+  await prisma.lesson.updateMany({
+    where: {
+      studentId,
+      startAt: { gte: now },
+      status: { in: ["SCHEDULED", "RESCHEDULED"] },
+    },
+    data: { status: "CANCELLED_BY_TEACHER" },
+  });
+  await prisma.recurringSchedule.updateMany({
+    where: { studentId },
+    data: { isActive: false },
+  });
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -11,6 +27,8 @@ export async function PUT(
   if (!body?.firstName) {
     return NextResponse.json({ error: "Вкажіть ім'я учня" }, { status: 400 });
   }
+
+  const isActive = body.isActive ?? true;
 
   const student = await prisma.student.update({
     where: { id },
@@ -25,9 +43,13 @@ export async function PUT(
       defaultLessonPrice: Number(body.defaultLessonPrice) || 0,
       paymentFrequency: body.paymentFrequency || null,
       notes: body.notes || null,
-      isActive: body.isActive ?? true,
+      isActive,
     },
   });
+
+  if (!isActive) {
+    await freeUpFutureLessons(id);
+  }
 
   return NextResponse.json(student);
 }
@@ -42,6 +64,8 @@ export async function DELETE(
     where: { id },
     data: { isActive: false },
   });
+
+  await freeUpFutureLessons(id);
 
   return NextResponse.json({ success: true });
 }
