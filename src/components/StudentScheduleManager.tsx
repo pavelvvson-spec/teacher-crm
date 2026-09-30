@@ -40,6 +40,12 @@ export default function StudentScheduleManager({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDay, setEditDay] = useState(1);
+  const [editTime, setEditTime] = useState("17:00");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
   const loadSchedules = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/students/${studentId}/schedules`);
@@ -86,7 +92,52 @@ export default function StudentScheduleManager({
     if (!confirm("Видалити цей розклад? Уже створені уроки залишаться, нові генеруватись не будуть.")) {
       return;
     }
-    await fetch(`/api/recurring-schedules/${scheduleId}`, { method: "DELETE" });
+
+    const res = await fetch(`/api/recurring-schedules/${scheduleId}`, { method: "DELETE" });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Не вдалося видалити графік");
+      return;
+    }
+
+    loadSchedules();
+  }
+
+  function startEdit(s: Schedule) {
+    setEditingId(s.id);
+    setEditDay(s.dayOfWeek);
+    setEditTime(s.startTime);
+    setEditError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditError("");
+  }
+
+  async function handleEditSave(scheduleId: string) {
+    setEditError("");
+    setEditSaving(true);
+
+    const res = await fetch(`/api/recurring-schedules/${scheduleId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dayOfWeek: editDay,
+        startTime: editTime,
+      }),
+    });
+
+    setEditSaving(false);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setEditError(data.error || "Помилка збереження");
+      return;
+    }
+
+    setEditingId(null);
     loadSchedules();
   }
 
@@ -113,23 +164,80 @@ export default function StudentScheduleManager({
         <p className="text-gray-500 text-sm">Сталого графіку ще немає. Уроки можна створювати вручну в календарі.</p>
       ) : (
         <div className="space-y-2">
-          {schedules.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl"
-            >
-              <p className="font-medium text-gray-800">
-                {dayLabel(s.dayOfWeek)} {s.startTime}
-              </p>
-              <button
-                type="button"
-                onClick={() => handleDelete(s.id)}
-                className="text-red-600 text-sm font-medium hover:underline"
+          {schedules.map((s) =>
+            editingId === s.id ? (
+              <div key={s.id} className="px-4 py-3 bg-gray-50 rounded-xl space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">День тижня</label>
+                    <select
+                      value={editDay}
+                      onChange={(e) => setEditDay(Number(e.target.value))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+                    >
+                      {DAYS_OF_WEEK.map((d) => (
+                        <option key={d.value} value={d.value}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Час</label>
+                    <input
+                      type="time"
+                      value={editTime}
+                      onChange={(e) => setEditTime(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+                    />
+                  </div>
+                </div>
+
+                {editError && <p className="text-red-600 text-sm">{editError}</p>}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleEditSave(s.id)}
+                    disabled={editSaving}
+                    className="px-5 py-2 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700 disabled:opacity-50"
+                  >
+                    {editSaving ? "Збереження..." : "Зберегти"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="px-5 py-2 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"
+                  >
+                    Скасувати
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                key={s.id}
+                className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl"
               >
-                Видалити
-              </button>
-            </div>
-          ))}
+                <p className="font-medium text-gray-800">
+                  {dayLabel(s.dayOfWeek)} {s.startTime}
+                </p>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(s)}
+                    className="text-pink-600 text-sm font-medium hover:underline"
+                  >
+                    Редагувати
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(s.id)}
+                    className="text-red-600 text-sm font-medium hover:underline"
+                  >
+                    Видалити
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
 

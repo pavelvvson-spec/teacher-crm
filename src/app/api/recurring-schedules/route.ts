@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { findConflictingLesson, findExactDuplicateLesson } from "@/lib/lesson-conflict";
+import { findConflictingLesson } from "@/lib/lesson-conflict";
+import { syncStudentLessons } from "@/lib/recurring-schedule-sync";
 
 const WEEKS_AHEAD = 8;
 
@@ -25,15 +26,6 @@ export async function POST(request: NextRequest) {
   const activeFrom = body.activeFrom ? new Date(body.activeFrom) : new Date();
 
   const [hours, minutes] = body.startTime.split(":").map(Number);
-  const candidateLessons: {
-    studentId: string;
-    startAt: Date;
-    endAt: Date;
-    duration: number;
-    format: "ONLINE" | "OFFLINE";
-    price: number;
-  }[] = [];
-
   const cursor = new Date(activeFrom);
   cursor.setHours(0, 0, 0, 0);
 
@@ -44,43 +36,18 @@ export async function POST(request: NextRequest) {
 
       if (startAt >= activeFrom) {
         const endAt = new Date(startAt.getTime() + duration * 60000);
-        candidateLessons.push({
-          studentId: body.studentId,
-          startAt,
-          endAt,
-          duration,
-          format,
-          price,
-        });
+        const conflict = await findConflictingLesson(startAt, endAt, undefined, body.studentId);
+        if (conflict) {
+          return NextResponse.json(
+            {
+              error: `Конфлікт часу: ${startAt.toLocaleDateString("uk-UA")} о ${startAt.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} вже є урок з учнем ${conflict.student.firstName}`,
+            },
+            { status: 409 }
+          );
+        }
       }
     }
     cursor.setDate(cursor.getDate() + 1);
-  }
-
-  // Перевіряємо конфлікти тільки з іншими учнями, дублікати з тим самим учнем пропускаємо
-  const lessonsToCreate: typeof candidateLessons = [];
-  for (const candidate of candidateLessons) {
-    const duplicate = await findExactDuplicateLesson(candidate.studentId, candidate.startAt);
-    if (duplicate) {
-      continue;
-    }
-
-    const conflict = await findConflictingLesson(
-      candidate.startAt,
-      candidate.endAt,
-      undefined,
-      candidate.studentId
-    );
-    if (conflict) {
-      return NextResponse.json(
-        {
-          error: `Конфлікт часу: ${candidate.startAt.toLocaleDateString("uk-UA")} о ${candidate.startAt.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" })} вже є урок з учнем ${conflict.student.firstName}`,
-        },
-        { status: 409 }
-      );
-    }
-
-    lessonsToCreate.push(candidate);
   }
 
   const schedule = await prisma.recurringSchedule.create({
@@ -96,61 +63,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  if (lessonsToCreate.length > 0) {
-    await prisma.lesson.createMany({ data: lessonsToCreate });
-  }
+  const { lessonsCreated, lessonsCancelled } = await syncStudentLessons(body.studentId, activeFrom);
 
-  // --- Очищення старих уроків, які більше не відповідають жодному активному графіку учня ---
-  const activeSchedules = await prisma.recurringSchedule.findMany({
-    where: { studentId: body.studentId, isActive: true },
-  });
-
-  const matchesAnySchedule = (lessonStartAt: Date) => {
-    const dow = lessonStartAt.getDay();
-    const hh = String(lessonStartAt.getHours()).padStart(2, "0");
-    const mm = String(lessonStartAt.getMinutes()).padStart(2, "0");
-    const timeStr = `${hh}:${mm}`;
-
-    return activeSchedules.some((s) => {
-      if (s.dayOfWeek !== dow) return false;
-      if (s.startTime !== timeStr) return false;
-      if (lessonStartAt < s.activeFrom) return false;
-      if (s.activeUntil && lessonStartAt > s.activeUntil) return false;
-      return true;
-    });
-  };
-
-  const futureLessons = await prisma.lesson.findMany({
-    where: {
-      studentId: body.studentId,
-      status: "SCHEDULED",
-      startAt: { gte: activeFrom },
-    },
-  });
-
-  const staleLessonIds = futureLessons
-    .filter((lesson) => !matchesAnySchedule(lesson.startAt))
-    .map((lesson) => lesson.id);
-
-  let cancelledCount = 0;
-  if (staleLessonIds.length > 0) {
-    await prisma.reminder.updateMany({
-      where: { lessonId: { in: staleLessonIds }, status: "PENDING" },
-      data: { status: "SKIPPED" },
-    });
-
-    const result = await prisma.lesson.updateMany({
-      where: { id: { in: staleLessonIds } },
-      data: {
-        status: "CANCELLED_BY_TEACHER",
-        cancellationReason: "Автоматично скасовано: змінено графік уроків",
-      },
-    });
-    cancelledCount = result.count;
-  }
-
-  return NextResponse.json(
-    { schedule, lessonsCreated: lessonsToCreate.length, lessonsCancelled: cancelledCount },
-    { status: 201 }
-  );
+  return NextResponse.json({ schedule, lessonsCreated, lessonsCancelled }, { status: 201 });
 }
