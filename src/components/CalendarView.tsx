@@ -74,6 +74,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [savingNote, setSavingNote] = useState(false);
   const [homeworkText, setHomeworkText] = useState("");
   const [savingHomework, setSavingHomework] = useState(false);
+  const [sendingHomework, setSendingHomework] = useState(false);
 
   const getRange = useCallback(() => {
     if (viewMode === "day") {
@@ -237,6 +238,22 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setSavingHomework(true);
     await updateLessonFields(selectedLesson, { homework: homeworkText });
     setSavingHomework(false);
+  }
+
+  async function sendHomeworkToTelegram() {
+    if (!selectedLesson) return;
+    setSendingHomework(true);
+    await updateLessonFields(selectedLesson, { homework: homeworkText });
+    const res = await fetch(`/api/lessons/${selectedLesson.id}/send-homework`, {
+      method: "POST",
+    });
+    setSendingHomework(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Не вдалося надіслати ДЗ");
+    } else {
+      alert("Домашнє завдання надіслано учню в Telegram!");
+    }
   }
 
   async function addLinkMaterial() {
@@ -654,13 +671,22 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
-              <button
-                onClick={saveHomework}
-                disabled={savingHomework}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
-              >
-                {savingHomework ? "Збереження..." : "Зберегти домашнє завдання"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={saveHomework}
+                  disabled={savingHomework}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {savingHomework ? "Збереження..." : "Зберегти домашнє завдання"}
+                </button>
+                <button
+                  onClick={sendHomeworkToTelegram}
+                  disabled={sendingHomework}
+                  className="px-4 py-2 bg-[#0088cc] text-white rounded-lg text-sm font-medium hover:bg-[#0077b3] disabled:opacity-50 flex items-center gap-1"
+                >
+                  ✈️ {sendingHomework ? "Надсилання..." : "Відправити ДЗ в Telegram"}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
