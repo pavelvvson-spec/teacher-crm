@@ -37,7 +37,16 @@ export default async function PaymentsPage() {
     },
   });
 
-  const monthIncome = monthLessons.reduce((sum: number, l: typeof monthLessons[number]) => sum + l.price, 0);
+  const monthPayments = await prisma.payment.findMany({
+    where: {
+      paidAt: { gte: monthStart, lte: monthEnd },
+      status: "PAID",
+    },
+  });
+
+  const monthIncome =
+    monthLessons.reduce((sum: number, l: typeof monthLessons[number]) => sum + l.price, 0) +
+    monthPayments.reduce((sum: number, p: typeof monthPayments[number]) => sum + p.amount, 0);
 
   return (
     <div className="space-y-6">
