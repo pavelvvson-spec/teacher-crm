@@ -4,10 +4,16 @@ export function calculateStudentBalance(
     paymentStatus: string;
     status: string;
   }[],
-  payments: { amount: number; status: string }[] = []
+  payments: { amount: number; status: string }[] = [],
+  paymentFrequency: string | null = null
 ): number {
+  const isPerLesson = !paymentFrequency || paymentFrequency === "PER_LESSON";
+
   const lessonsBalance = lessons.reduce((total, lesson) => {
     if (lesson.status === "CANCELLED_BY_STUDENT" || lesson.status === "CANCELLED_BY_TEACHER") {
+      return total;
+    }
+    if (isPerLesson && lesson.status !== "COMPLETED") {
       return total;
     }
     if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {

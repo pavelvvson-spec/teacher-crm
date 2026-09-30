@@ -17,7 +17,7 @@ export default async function PaymentsPage() {
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
-      balance: calculateStudentBalance(student.lessons, student.payments),
+      balance: calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency),
     }))
     .filter((s: { balance: number }) => s.balance !== 0)
     .sort((a: { balance: number }, b: { balance: number }) => b.balance - a.balance);
