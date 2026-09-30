@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { calculateStudentBalance } from "@/lib/payments-utils";
 import ResetPaymentsButton from "@/components/ResetPaymentsButton";
+import PayStudentButton from "@/components/PayStudentButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function PaymentsPage() {
   const students = await prisma.student.findMany({
     where: { isActive: true },
-    include: { lessons: true },
+    include: { lessons: true, payments: true },
     orderBy: { firstName: "asc" },
   });
 
@@ -16,7 +17,7 @@ export default async function PaymentsPage() {
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
-      balance: calculateStudentBalance(student.lessons),
+      balance: calculateStudentBalance(student.lessons, student.payments),
     }))
     .filter((s: { balance: number }) => s.balance !== 0)
     .sort((a: { balance: number }, b: { balance: number }) => b.balance - a.balance);
@@ -67,9 +68,12 @@ export default async function PaymentsPage() {
                 <p className="font-medium text-gray-800">
                   {s.firstName} {s.lastName ?? ""}
                 </p>
-                <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
-                  {s.balance > 0 ? `Борг: ${s.balance} грн` : `Передоплата: ${Math.abs(s.balance)} грн`}
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
+                    {s.balance > 0 ? `Борг: ${s.balance} грн` : `Передоплата: ${Math.abs(s.balance)} грн`}
+                  </p>
+                  {s.balance > 0 && <PayStudentButton studentId={s.id} />}
+                </div>
               </div>
             ))}
           </div>
