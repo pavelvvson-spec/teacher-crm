@@ -15,6 +15,7 @@ type Lesson = {
   startAt: string;
   duration: number;
   teacherNotes: string | null;
+  homework: string | null;
   student: { firstName: string; lastName: string | null };
   materials: Material[];
 };
@@ -29,6 +30,8 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
   const [uploading, setUploading] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [homeworkText, setHomeworkText] = useState("");
+  const [savingHomework, setSavingHomework] = useState(false);
 
   const materialTypeLabels: Record<string, string> = {
     LINK: "Посилання",
@@ -59,6 +62,7 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     setNewLinkUrl("");
     const lesson = lessonsState.find((l) => l.id === lessonId);
     setNoteText(lesson?.teacherNotes || "");
+    setHomeworkText(lesson?.homework || "");
     loadMaterials(lessonId);
   }
 
@@ -74,6 +78,20 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
       prev.map((l) => (l.id === openLessonId ? { ...l, teacherNotes: noteText } : l))
     );
     setSavingNote(false);
+  }
+
+  async function saveHomework() {
+    if (!openLessonId) return;
+    setSavingHomework(true);
+    await fetch(`/api/lessons/${openLessonId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ homework: homeworkText }),
+    });
+    setLessonsState((prev) =>
+      prev.map((l) => (l.id === openLessonId ? { ...l, homework: homeworkText } : l))
+    );
+    setSavingHomework(false);
   }
 
   async function addLinkMaterial() {
@@ -155,13 +173,26 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                           📝 {lesson.teacherNotes}
                         </p>
                       )}
+                      {lesson.homework && (
+                        <p className="text-xs italic text-purple-600 mt-1">
+                          📚 ДЗ: {lesson.homework}
+                        </p>
+                      )}
                     </div>
-                    <button
-                      onClick={() => openLesson(lesson.id)}
-                      className="px-4 py-2 bg-pink-50 text-pink-700 rounded-xl text-sm font-medium hover:bg-pink-100"
-                    >
-                      Підготувати урок
-                    </button>
+                    <div className="flex flex-col gap-2 items-stretch">
+                      <button
+                        onClick={() => openLesson(lesson.id)}
+                        className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-medium hover:bg-purple-100"
+                      >
+                        Задати домашнє завдання
+                      </button>
+                      <button
+                        onClick={() => openLesson(lesson.id)}
+                        className="px-4 py-2 bg-pink-50 text-pink-700 rounded-xl text-sm font-medium hover:bg-pink-100"
+                      >
+                        Підготувати урок
+                      </button>
+                    </div>
                   </div>
                   {lesson.materials.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -219,6 +250,24 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                 className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50"
               >
                 {savingNote ? "Збереження..." : "Зберегти нотатку"}
+              </button>
+            </div>
+
+            <div className="border-b border-gray-100 pb-4 space-y-2">
+              <p className="text-sm font-medium text-gray-700">Домашнє завдання (для наступного уроку)</p>
+              <textarea
+                value={homeworkText}
+                onChange={(e) => setHomeworkText(e.target.value)}
+                placeholder="Наприклад: вивчити 10 слів, зробити вправи 3-5 на стор. 12..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <button
+                onClick={saveHomework}
+                disabled={savingHomework}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+              >
+                {savingHomework ? "Збереження..." : "Зберегти домашнє завдання"}
               </button>
             </div>
 

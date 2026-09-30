@@ -18,6 +18,7 @@ export async function PUT(
   if (body.status !== undefined) data.status = body.status;
   if (body.paymentStatus !== undefined) data.paymentStatus = body.paymentStatus;
   if (body.teacherNotes !== undefined) data.teacherNotes = body.teacherNotes || null;
+  if (body.homework !== undefined) data.homework = body.homework || null;
   if (body.cancellationReason !== undefined) data.cancellationReason = body.cancellationReason || null;
   if (body.meetingLink !== undefined) data.meetingLink = body.meetingLink || null;
   if (body.price !== undefined) data.price = Number(body.price);

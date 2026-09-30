@@ -37,6 +37,7 @@ type Lesson = {
   paymentStatus: string;
   meetingLink: string | null;
   teacherNotes: string | null;
+  homework: string | null;
   student: { firstName: string; lastName: string | null };
 };
 
@@ -71,6 +72,8 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [uploading, setUploading] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [homeworkText, setHomeworkText] = useState("");
+  const [savingHomework, setSavingHomework] = useState(false);
 
   const getRange = useCallback(() => {
     if (viewMode === "day") {
@@ -218,6 +221,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setNewLinkTitle("");
     setNewLinkUrl("");
     setNoteText(lesson.teacherNotes || "");
+    setHomeworkText(lesson.homework || "");
     loadMaterials(lesson.id);
   }
 
@@ -226,6 +230,13 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setSavingNote(true);
     await updateLessonFields(selectedLesson, { teacherNotes: noteText });
     setSavingNote(false);
+  }
+
+  async function saveHomework() {
+    if (!selectedLesson) return;
+    setSavingHomework(true);
+    await updateLessonFields(selectedLesson, { homework: homeworkText });
+    setSavingHomework(false);
   }
 
   async function addLinkMaterial() {
@@ -396,6 +407,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
                             📝 {lesson.teacherNotes}
                           </p>
                         )}
+                        {lesson.homework && (
+                          <p className="truncate italic text-[11px] opacity-80">
+                            📚 {lesson.homework}
+                          </p>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -470,6 +486,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
             {selectedLesson.teacherNotes && (
               <p className="text-sm bg-pink-50 text-pink-700 rounded-lg px-3 py-2">
                 📝 {selectedLesson.teacherNotes}
+              </p>
+            )}
+            {selectedLesson.homework && (
+              <p className="text-sm bg-purple-50 text-purple-700 rounded-lg px-3 py-2">
+                📚 ДЗ: {selectedLesson.homework}
               </p>
             )}
 
@@ -621,6 +642,24 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50"
               >
                 {savingNote ? "Збереження..." : "Зберегти нотатку"}
+              </button>
+            </div>
+
+            <div className="border-b border-gray-100 pb-4 space-y-2">
+              <p className="text-sm font-medium text-gray-700">Домашнє завдання (для наступного уроку)</p>
+              <textarea
+                value={homeworkText}
+                onChange={(e) => setHomeworkText(e.target.value)}
+                placeholder="Наприклад: вивчити 10 слів, зробити вправи 3-5 на стор. 12..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <button
+                onClick={saveHomework}
+                disabled={savingHomework}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+              >
+                {savingHomework ? "Збереження..." : "Зберегти домашнє завдання"}
               </button>
             </div>
 

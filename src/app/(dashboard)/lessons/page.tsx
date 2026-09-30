@@ -25,6 +25,7 @@ export default async function LessonsPage() {
           startAt: l.startAt.toISOString(),
           duration: l.duration,
           teacherNotes: l.teacherNotes,
+          homework: l.homework,
           student: { firstName: l.student.firstName, lastName: l.student.lastName },
           materials: l.materials.map((m: typeof l.materials[number]) => ({
             id: m.id,
