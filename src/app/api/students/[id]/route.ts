@@ -55,10 +55,20 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const body = await request.json().catch(() => null);
+
+  if (body?.hard) {
+    await prisma.reminder.deleteMany({ where: { studentId: id } });
+    await prisma.payment.deleteMany({ where: { studentId: id } });
+    await prisma.recurringSchedule.deleteMany({ where: { studentId: id } });
+    await prisma.lesson.deleteMany({ where: { studentId: id } });
+    await prisma.student.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  }
 
   await prisma.student.update({
     where: { id },
