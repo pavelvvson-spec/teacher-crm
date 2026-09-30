@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import StudentForm from "@/components/StudentForm";
 import StudentScheduleManager from "@/components/StudentScheduleManager";
+import { getStudentNumber } from "@/lib/student-number";
 
 export default async function StudentDetailPage({
   params,
@@ -15,10 +16,12 @@ export default async function StudentDetailPage({
     notFound();
   }
 
+  const studentNumber = await getStudentNumber(id);
+
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-gray-400 font-medium">Учень №{student.studentNumber}</p>
+        <p className="text-sm text-gray-400 font-medium">Учень №{studentNumber}</p>
         <h1 className="text-2xl font-semibold text-gray-800">
           {student.firstName} {student.lastName ?? ""}
         </h1>

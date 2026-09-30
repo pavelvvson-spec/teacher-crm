@@ -5,7 +5,12 @@ import ResetAllStudentsButton from "@/components/ResetAllStudentsButton";
 export const dynamic = "force-dynamic";
 
 export default async function StudentsPage() {
-  const students = await prisma.student.findMany({ orderBy: { firstName: "asc" } });
+  const studentsByCreation = await prisma.student.findMany({ orderBy: { createdAt: "asc" } });
+  const numbered = studentsByCreation.map((s: typeof studentsByCreation[number], i: number) => ({
+    ...s,
+    displayNumber: i + 1,
+  }));
+  const students = [...numbered].sort((a, b) => a.firstName.localeCompare(b.firstName, "uk"));
 
   const activeCount = students.filter((s: typeof students[number]) => s.isActive).length;
   const inactiveCount = students.length - activeCount;
@@ -41,7 +46,7 @@ export default async function StudentsPage() {
             >
               <div>
                 <p className="font-medium text-gray-800">
-                  {student.firstName} {student.lastName ?? ""}
+                  №{student.displayNumber} {student.firstName} {student.lastName ?? ""}
                 </p>
                 <p className="text-sm text-gray-500">
                   Рівень: {student.englishLevel} ·{" "}
