@@ -50,6 +50,8 @@ type Material = {
 
 type ViewMode = "day" | "week" | "month";
 
+const WEEKDAY_HEADERS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+
 export default function CalendarView({ students }: { students: Student[] }) {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -276,11 +278,19 @@ export default function CalendarView({ students }: { students: Student[] }) {
   };
 
   const { from } = getRange();
-  const daysToShow =
-    viewMode === "day" ? 1 : viewMode === "week" ? 7 : endOfMonth(currentDate).getDate();
-  const rangeStart = viewMode === "month" ? startOfMonth(currentDate) : from;
 
-  const days = Array.from({ length: daysToShow }, (_, i) => addDays(rangeStart, i));
+  let days: Date[];
+  if (viewMode === "month") {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const gridStart = startOfWeek(monthStart);
+    const gridEnd = addDays(startOfWeek(monthEnd), 6);
+    const totalDays = Math.round((gridEnd.getTime() - gridStart.getTime()) / 86400000) + 1;
+    days = Array.from({ length: totalDays }, (_, i) => addDays(gridStart, i));
+  } else {
+    const daysToShow = viewMode === "day" ? 1 : 7;
+    days = Array.from({ length: daysToShow }, (_, i) => addDays(from, i));
+  }
 
   function lessonsForDay(day: Date) {
     const dayStr = day.toDateString();
@@ -335,44 +345,61 @@ export default function CalendarView({ students }: { students: Student[] }) {
 
       <p className="text-gray-500 font-medium">{formatMonthYear(currentDate)}</p>
 
+      {viewMode === "month" && (
+        <div className="grid grid-cols-7 gap-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          {WEEKDAY_HEADERS.map((label) => (
+            <div key={label}>{label}</div>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <p className="text-gray-400">Завантаження...</p>
       ) : (
         <div
           className={`grid gap-3 ${
-            viewMode === "day" ? "grid-cols-1" : viewMode === "week" ? "grid-cols-1 sm:grid-cols-7" : "grid-cols-2 sm:grid-cols-7"
+            viewMode === "day" ? "grid-cols-1" : viewMode === "week" ? "grid-cols-1 sm:grid-cols-7" : "grid-cols-7"
           }`}
         >
           {days.map((day) => {
             const dayLessons = lessonsForDay(day);
             const isToday = day.toDateString() === new Date().toDateString();
+            const isCurrentMonth = viewMode !== "month" || day.getMonth() === currentDate.getMonth();
             return (
               <div
                 key={day.toISOString()}
-                className={`bg-white rounded-2xl shadow-sm p-3 min-h-[100px] ${
-                  isToday ? "ring-2 ring-pink-400" : ""
-                }`}
+                className={`rounded-2xl shadow-sm p-3 min-h-[100px] ${
+                  isCurrentMonth ? "bg-white" : "bg-gray-50"
+                } ${isToday ? "ring-2 ring-pink-400" : ""}`}
               >
-                <p className="text-sm font-medium text-gray-500 mb-2">{formatDayLabel(day)}</p>
-                <div className="space-y-1">
-                  {dayLessons.map((lesson) => (
-                    <button
-                      key={lesson.id}
-                      onClick={() => setSelectedLesson(lesson)}
-                      className={`w-full text-left px-2 py-1 rounded-lg text-xs ${statusColors[lesson.status]}`}
-                    >
-                      <p className="font-medium">{formatTime(new Date(lesson.startAt))}</p>
-                      <p className="truncate">
-                        {lesson.student.firstName} {lesson.student.lastName ?? ""}
-                      </p>
-                      {lesson.teacherNotes && (
-                        <p className="truncate italic text-[11px] opacity-80">
-                          📝 {lesson.teacherNotes}
+                <p
+                  className={`text-sm font-medium mb-2 ${
+                    isCurrentMonth ? "text-gray-500" : "text-gray-300"
+                  }`}
+                >
+                  {formatDayLabel(day)}
+                </p>
+                {isCurrentMonth && (
+                  <div className="space-y-1">
+                    {dayLessons.map((lesson) => (
+                      <button
+                        key={lesson.id}
+                        onClick={() => setSelectedLesson(lesson)}
+                        className={`w-full text-left px-2 py-1 rounded-lg text-xs ${statusColors[lesson.status]}`}
+                      >
+                        <p className="font-medium">{formatTime(new Date(lesson.startAt))}</p>
+                        <p className="truncate">
+                          {lesson.student.firstName} {lesson.student.lastName ?? ""}
                         </p>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                        {lesson.teacherNotes && (
+                          <p className="truncate italic text-[11px] opacity-80">
+                            📝 {lesson.teacherNotes}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
