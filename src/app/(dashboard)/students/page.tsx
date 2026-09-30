@@ -6,11 +6,10 @@ export const dynamic = "force-dynamic";
 
 export default async function StudentsPage() {
   const studentsByCreation = await prisma.student.findMany({ orderBy: { createdAt: "asc" } });
-  const numbered = studentsByCreation.map((s: typeof studentsByCreation[number], i: number) => ({
+  const students = studentsByCreation.map((s: typeof studentsByCreation[number], i: number) => ({
     ...s,
     displayNumber: i + 1,
   }));
-  const students = [...numbered].sort((a, b) => a.firstName.localeCompare(b.firstName, "uk"));
 
   const activeCount = students.filter((s: typeof students[number]) => s.isActive).length;
   const inactiveCount = students.length - activeCount;
