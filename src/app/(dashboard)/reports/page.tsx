@@ -2,6 +2,23 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function formatLessonDateTimeKyiv(date: Date): string {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "Europe/Kyiv",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  UNPAID: "Не оплачено",
+  DEBT: "Борг",
+  PARTIALLY_PAID: "Частково оплачено",
+};
+
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -47,6 +64,15 @@ export default async function ReportsPage({
 
   const fromStr = from.toISOString().slice(0, 10);
   const toStr = to.toISOString().slice(0, 10);
+
+  const allUnpaidLessons = await prisma.lesson.findMany({
+    where: {
+      status: "COMPLETED",
+      paymentStatus: { in: ["UNPAID", "DEBT", "PARTIALLY_PAID"] },
+    },
+    include: { student: true },
+    orderBy: { startAt: "asc" },
+  });
 
   return (
     <div className="space-y-6">
@@ -108,6 +134,33 @@ export default async function ReportsPage({
               <div key={i} className="flex items-center justify-between py-3">
                 <p className="font-medium text-gray-800">{d.name}</p>
                 <p className="font-semibold text-red-600">{d.amount} грн</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">Неоплачені уроки (за весь час)</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Список кожного окремого неоплаченого уроку — для звірки, незалежно від обраного періоду вище.
+        </p>
+        {allUnpaidLessons.length === 0 ? (
+          <p className="text-gray-500">Неоплачених уроків немає — усе оплачено.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {allUnpaidLessons.map((lesson: typeof allUnpaidLessons[number]) => (
+              <div key={lesson.id} className="flex items-center justify-between py-3">
+                <div>
+                  <p className="font-medium text-gray-800">
+                    {lesson.student.firstName} {lesson.student.lastName ?? ""}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {formatLessonDateTimeKyiv(lesson.startAt)} ·{" "}
+                    {PAYMENT_STATUS_LABELS[lesson.paymentStatus] ?? lesson.paymentStatus}
+                  </p>
+                </div>
+                <p className="font-semibold text-red-600">{lesson.price} грн</p>
               </div>
             ))}
           </div>
