@@ -29,12 +29,19 @@ export async function POST(request: NextRequest) {
   const username: string | undefined = message.from?.username;
 
   if (text === "/start_teacher") {
-    const settings = await prisma.settings.findFirst();
+    const existingSettings = await prisma.settings.findFirst();
 
-    if (settings) {
+    if (existingSettings) {
       await prisma.settings.update({
-        where: { id: settings.id },
+        where: { id: existingSettings.id },
         data: { teacherTelegramChatId: chatId },
+      });
+    } else {
+      await prisma.settings.create({
+        data: {
+          teacherName: "Вчитель",
+          teacherTelegramChatId: chatId,
+        },
       });
     }
 
