@@ -2,10 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   sendTelegramMessage,
+  sendTelegramMessageWithKeyboard,
   answerTelegramCallbackQuery,
   editTelegramMessageText,
 } from "@/lib/telegram";
 import { checkAndMaybeSendSummary } from "@/lib/daily-checkup";
+
+const HOMEWORK_BUTTON_TEXT = "📚 Отримати домашнє завдання";
+
+function formatLessonDateTimeKyiv(date: Date): string {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "Europe/Kyiv",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -71,9 +84,10 @@ export async function POST(request: NextRequest) {
         where: { id: student.id },
         data: { telegramChatId: chatId },
       });
-      await sendTelegramMessage(
+      await sendTelegramMessageWithKeyboard(
         chatId,
-        `Привіт, ${student.firstName}! Тепер ви будете отримувати нагадування про уроки в цьому чаті.`
+        `Привіт, ${student.firstName}! Тепер ви будете отримувати нагадування про уроки в цьому чаті.`,
+        [HOMEWORK_BUTTON_TEXT]
       );
     } else {
       await sendTelegramMessage(
@@ -81,9 +95,66 @@ export async function POST(request: NextRequest) {
         `Привіт! Не вдалося знайти вас у списку учнів за username. Попросіть викладача перевірити, чи правильно вказано ваш Telegram username у системі.`
       );
     }
+
+    return NextResponse.json({ ok: true });
+  }
+
+  if (text === HOMEWORK_BUTTON_TEXT || text === "/homework") {
+    await handleHomeworkRequest(chatId);
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ ok: true });
+}
+
+async function handleHomeworkRequest(chatId: string) {
+  const student = await prisma.student.findFirst({
+    where: { telegramChatId: chatId },
+  });
+
+  if (!student) {
+    await sendTelegramMessage(
+      chatId,
+      `Не вдалося знайти вас у системі. Попросіть викладача перевірити підключення.`
+    );
+    return;
+  }
+
+  const nextLesson = await prisma.lesson.findFirst({
+    where: {
+      studentId: student.id,
+      startAt: { gte: new Date() },
+      status: "SCHEDULED",
+    },
+    orderBy: { startAt: "asc" },
+  });
+
+  if (!nextLesson) {
+    await sendTelegramMessage(chatId, `У вас поки немає запланованих уроків.`);
+    return;
+  }
+
+  if (!nextLesson.homework) {
+    await sendTelegramMessage(
+      chatId,
+      `На жаль, домашнє завдання до наступного уроку ще не задано. Зверніться до викладача.`
+    );
+
+    const settings = await prisma.settings.findFirst();
+    if (settings?.teacherTelegramChatId) {
+      const dateLabel = formatLessonDateTimeKyiv(nextLesson.startAt);
+      await sendTelegramMessage(
+        settings.teacherTelegramChatId,
+        `⚠️ ${student.firstName} ${student.lastName ?? ""} просив(ла) домашнє завдання до уроку ${dateLabel}, але воно ще не внесене в CRM.`
+      );
+    }
+    return;
+  }
+
+  await sendTelegramMessage(
+    chatId,
+    `📚 Домашнє завдання\n\n${nextLesson.homework}\n\nУспіхів! 😊`
+  );
 }
 
 async function handleCallbackQuery(callbackQuery: {
