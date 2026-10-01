@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendDailySummary } from "@/lib/daily-checkup";
+import { sendDailySummary, sendMonthlyReportIfLastDay } from "@/lib/daily-checkup";
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await sendDailySummary();
-  return NextResponse.json(result);
+  const summaryResult = await sendDailySummary();
+  const monthlyResult = await sendMonthlyReportIfLastDay();
+
+  return NextResponse.json({ summary: summaryResult, monthly: monthlyResult });
 }

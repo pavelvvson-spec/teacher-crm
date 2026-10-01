@@ -181,6 +181,7 @@ model Settings {
   teacherTelegramChatId     String?
   lastCheckupSentAt         DateTime?
   lastSummarySentAt         DateTime?
+  lastMonthlyReportSentAt   DateTime?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 }

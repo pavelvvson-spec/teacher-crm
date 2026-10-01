@@ -166,42 +166,104 @@ async function handleCallbackQuery(callbackQuery: {
   const chatId = callbackQuery.message?.chat?.id ? String(callbackQuery.message.chat.id) : undefined;
   const messageId = callbackQuery.message?.message_id;
 
-  if (!data || !data.startsWith("c:")) {
+  if (!data) {
     await answerTelegramCallbackQuery(callbackQuery.id);
     return;
   }
 
-  const parts = data.split(":");
-  const lessonId = parts[1];
-  const outcome = parts[2]; // "1" = проведено, "0" = не відбувся
+  if (data.startsWith("chk:")) {
+    const parts = data.split(":");
+    const lessonId = parts[1];
+    const code = parts[2]; // "1" = проведено+оплачено, "2" = проведено, не оплачено, "0" = не відбувся
 
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    include: { student: true },
-  });
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { student: true },
+    });
 
-  if (!lesson) {
-    await answerTelegramCallbackQuery(callbackQuery.id, "Урок не знайдено");
+    if (!lesson) {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Урок не знайдено");
+      return;
+    }
+
+    let resultLabel: string;
+        const updateData: { status: "COMPLETED" | "NO_SHOW"; paymentStatus?: "PAID" } = {
+      status: "COMPLETED",
+    };
+
+    if (code === "1") {
+      updateData.paymentStatus = "PAID";
+      resultLabel = "✅ Проведено, оплачено";
+    } else if (code === "2") {
+      resultLabel = "🟡 Проведено, не оплачено";
+    } else {
+      updateData.status = "NO_SHOW";
+      resultLabel = "❌ Не відбувся";
+    }
+
+    await prisma.lesson.update({
+      where: { id: lessonId },
+      data: updateData,
+    });
+
+    await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
+
+    if (messageId && chatId) {
+      await editTelegramMessageText(
+        chatId,
+        messageId,
+        `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n${resultLabel}`
+      );
+    }
+
+    await checkAndMaybeSendSummary();
     return;
   }
 
-  const newStatus = outcome === "1" ? "COMPLETED" : "NO_SHOW";
+  if (data.startsWith("pay:")) {
+    const parts = data.split(":");
+    const lessonId = parts[1];
+    const code = parts[2]; // "1" = оплачено, "0" = ще ні
 
-  await prisma.lesson.update({
-    where: { id: lessonId },
-    data: { status: newStatus },
-  });
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { student: true },
+    });
 
-  await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
+    if (!lesson) {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Урок не знайдено");
+      return;
+    }
 
-  if (messageId && chatId) {
-    const resultLabel = outcome === "1" ? "✅ Проведено" : "❌ Не відбувся";
-    await editTelegramMessageText(
-      chatId,
-      messageId,
-      `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n${resultLabel}`
-    );
+    if (code === "1") {
+      await prisma.lesson.update({
+        where: { id: lessonId },
+        data: { paymentStatus: "PAID" },
+      });
+
+      await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
+
+      if (messageId && chatId) {
+        await editTelegramMessageText(
+          chatId,
+          messageId,
+          `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n✅ Оплачено`
+        );
+      }
+    } else {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Добре, запитаю завтра знову");
+
+      if (messageId && chatId) {
+        await editTelegramMessageText(
+          chatId,
+          messageId,
+          `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n⏳ Ще не оплачено (запитаю завтра знову)`
+        );
+      }
+    }
+
+    return;
   }
 
-  await checkAndMaybeSendSummary();
+  await answerTelegramCallbackQuery(callbackQuery.id);
 }
