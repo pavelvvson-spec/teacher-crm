@@ -6,7 +6,7 @@ import {
   answerTelegramCallbackQuery,
   editTelegramMessageText,
 } from "@/lib/telegram";
-import { checkAndMaybeSendSummary } from "@/lib/daily-checkup";
+import { checkAndMaybeSendSummary, settleStudentPeriodicPayments } from "@/lib/daily-checkup";
 
 const HOMEWORK_BUTTON_TEXT = "📚 Отримати домашнє завдання";
 
@@ -187,7 +187,7 @@ async function handleCallbackQuery(callbackQuery: {
     }
 
     let resultLabel: string;
-        const updateData: { status: "COMPLETED" | "NO_SHOW"; paymentStatus?: "PAID" } = {
+    const updateData: { status: "COMPLETED" | "NO_SHOW"; paymentStatus?: "PAID" } = {
       status: "COMPLETED",
     };
 
@@ -260,6 +260,45 @@ async function handleCallbackQuery(callbackQuery: {
           `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n⏳ Ще не оплачено (запитаю завтра знову)`
         );
       }
+    }
+
+    return;
+  }
+
+  if (data.startsWith("paybulkno:")) {
+    const studentId = data.split(":")[1];
+    const student = await prisma.student.findUnique({ where: { id: studentId } });
+
+    await answerTelegramCallbackQuery(callbackQuery.id, "Добре, запитаю завтра знову");
+
+    if (messageId && chatId) {
+      await editTelegramMessageText(
+        chatId,
+        messageId,
+        `💰 ${student ? `${student.firstName} ${student.lastName ?? ""}` : "Учень"}\n\n⏳ Ще не оплачено (запитаю завтра знову)`
+      );
+    }
+
+    return;
+  }
+
+  if (data.startsWith("paybulk:")) {
+    const studentId = data.split(":")[1];
+    const result = await settleStudentPeriodicPayments(studentId);
+
+    if (!result) {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Учня не знайдено");
+      return;
+    }
+
+    await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
+
+    if (messageId && chatId) {
+      await editTelegramMessageText(
+        chatId,
+        messageId,
+        `💰 ${result.studentName}\n\n✅ Оплачено все (${result.count} ур., ${result.total} грн)`
+      );
     }
 
     return;

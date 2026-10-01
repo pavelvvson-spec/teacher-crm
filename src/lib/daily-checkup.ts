@@ -1,9 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import { kyivWallTimeToUtc, getKyivTimeParts } from "@/lib/kyiv-time";
+import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 import {
   sendTelegramMessage,
   sendTelegramMessageWithButtons,
 } from "@/lib/telegram";
+
+const PERIODIC_FREQUENCIES = ["WEEKLY", "MONTHLY", "END_OF_WEEK", "END_OF_MONTH"];
+
+const PAYMENT_FREQUENCY_LABELS: Record<string, string> = {
+  WEEKLY: "потижнева оплата",
+  MONTHLY: "помісячна оплата",
+  END_OF_WEEK: "оплата в кінці тижня",
+  END_OF_MONTH: "оплата в кінці місяця",
+};
 
 function getTodayKyivRangeUtc(): { start: Date; end: Date; dateLabel: string } {
   const now = new Date();
@@ -28,6 +37,20 @@ function getTodayKyivRangeUtc(): { start: Date; end: Date; dateLabel: string } {
   return { start, end, dateLabel };
 }
 
+function getKyivDateParts(date: Date): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const map: Record<string, string> = {};
+  for (const p of parts) map[p.type] = p.value;
+
+  return { year: Number(map.year), month: Number(map.month) - 1, day: Number(map.day) };
+}
+
 function formatLessonDateTimeKyiv(date: Date): string {
   return new Intl.DateTimeFormat("uk-UA", {
     timeZone: "Europe/Kyiv",
@@ -50,6 +73,110 @@ function isSameUtcMonth(a: Date, b: Date): boolean {
   return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth();
 }
 
+function getMonthRangeUtc(year: number, monthIndex0: number): { start: Date; end: Date } {
+  let nextMonth = monthIndex0 + 1;
+  let nextYear = year;
+  if (nextMonth > 11) {
+    nextMonth = 0;
+    nextYear += 1;
+  }
+  const start = kyivWallTimeToUtc(year, monthIndex0, 1, 0, 0);
+  const end = kyivWallTimeToUtc(nextYear, nextMonth, 1, 0, 0);
+  return { start, end };
+}
+
+function getWeekRangeUtc(year: number, month: number, day: number): { start: Date; end: Date } {
+  const weekday = new Date(Date.UTC(year, month, day)).getUTCDay(); // 0=Нд..6=Сб
+  const daysSinceMonday = (weekday + 6) % 7;
+
+  const monday = new Date(Date.UTC(year, month, day));
+  monday.setUTCDate(monday.getUTCDate() - daysSinceMonday);
+
+  const nextMonday = new Date(monday);
+  nextMonday.setUTCDate(monday.getUTCDate() + 7);
+
+  const start = kyivWallTimeToUtc(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 0, 0);
+  const end = kyivWallTimeToUtc(
+    nextMonday.getUTCFullYear(),
+    nextMonday.getUTCMonth(),
+    nextMonday.getUTCDate(),
+    0,
+    0
+  );
+  return { start, end };
+}
+
+function getPeriodRangeForLesson(
+  lesson: { startAt: Date },
+  paymentFrequency: string | null
+): { start: Date; end: Date } {
+  const { year, month, day } = getKyivDateParts(lesson.startAt);
+  if (paymentFrequency === "WEEKLY" || paymentFrequency === "END_OF_WEEK") {
+    return getWeekRangeUtc(year, month, day);
+  }
+  return getMonthRangeUtc(year, month);
+}
+
+type UnpaidLesson = {
+  id: string;
+  price: number;
+};
+
+async function getReadyPeriodicUnpaidLessons(
+  studentId: string,
+  paymentFrequency: string | null
+): Promise<UnpaidLesson[]> {
+  const unpaidLessons = await prisma.lesson.findMany({
+    where: {
+      studentId,
+      status: "COMPLETED",
+      paymentStatus: { in: ["UNPAID", "DEBT", "PARTIALLY_PAID"] },
+    },
+  });
+
+  const ready: UnpaidLesson[] = [];
+
+  for (const lesson of unpaidLessons) {
+    const { start: periodStart, end: periodEnd } = getPeriodRangeForLesson(lesson, paymentFrequency);
+    const remainingScheduled = await prisma.lesson.count({
+      where: {
+        studentId,
+        startAt: { gte: periodStart, lt: periodEnd },
+        status: "SCHEDULED",
+      },
+    });
+
+    if (remainingScheduled === 0) {
+      ready.push({ id: lesson.id, price: lesson.price });
+    }
+  }
+
+  return ready;
+}
+
+export async function settleStudentPeriodicPayments(
+  studentId: string
+): Promise<{ count: number; total: number; studentName: string } | null> {
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  if (!student) return null;
+
+  const readyLessons = await getReadyPeriodicUnpaidLessons(studentId, student.paymentFrequency);
+  const total = readyLessons.reduce((sum, l) => sum + l.price, 0);
+
+  if (readyLessons.length > 0) {
+    await prisma.lesson.updateMany({
+      where: { id: { in: readyLessons.map((l) => l.id) } },
+      data: { paymentStatus: "PAID" },
+    });
+  }
+
+  return {
+    count: readyLessons.length,
+    total,
+    studentName: `${student.firstName} ${student.lastName ?? ""}`.trim(),
+  };
+}
+
 export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: string }> {
   const settings = await prisma.settings.findFirst();
 
@@ -62,12 +189,12 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
     return { sent: false, reason: "Чекап на сьогодні вже надсилався" };
   }
 
-  const { start, end } = getTodayKyivRangeUtc();
+  const { end } = getTodayKyivRangeUtc();
 
-  // Сьогоднішні уроки, які ще не відмічені як проведені/непроведені
+  // Усі ще не відмічені уроки (сьогоднішні і будь-які минулі, що лишились SCHEDULED)
   const unmarkedLessons = await prisma.lesson.findMany({
     where: {
-      startAt: { gte: start, lte: end },
+      startAt: { lte: end },
       status: "SCHEDULED",
     },
     include: { student: true },
@@ -89,7 +216,14 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
     data: { lastCheckupSentAt: now },
   });
 
-  for (const lesson of unpaidLessons) {
+  const perLessonUnpaid = unpaidLessons.filter(
+    (l) => !l.student.paymentFrequency || l.student.paymentFrequency === "PER_LESSON"
+  );
+  const periodicUnpaid = unpaidLessons.filter(
+    (l) => l.student.paymentFrequency && PERIODIC_FREQUENCIES.includes(l.student.paymentFrequency)
+  );
+
+  for (const lesson of perLessonUnpaid) {
     const dateLabel = formatLessonDateTimeKyiv(lesson.startAt);
     const text =
       `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} (${dateLabel}, ${lesson.price} грн) ще не оплачено.\n\n` +
@@ -103,17 +237,41 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
     ]);
   }
 
+  const periodicStudentIds = Array.from(new Set(periodicUnpaid.map((l) => l.studentId)));
+
+  for (const studentId of periodicStudentIds) {
+    const sampleLesson = periodicUnpaid.find((l) => l.studentId === studentId)!;
+    const student = sampleLesson.student;
+
+    const readyLessons = await getReadyPeriodicUnpaidLessons(studentId, student.paymentFrequency);
+    if (readyLessons.length === 0) continue;
+
+    const total = readyLessons.reduce((sum, l) => sum + l.price, 0);
+    const freqLabel = PAYMENT_FREQUENCY_LABELS[student.paymentFrequency ?? ""] ?? "періодична оплата";
+
+    const text =
+      `💰 ${student.firstName} ${student.lastName ?? ""} (${freqLabel})\n\n` +
+      `Період завершено. Неоплачених уроків: ${readyLessons.length}, сума: ${total} грн.\n\n` +
+      `Оплатили все?`;
+
+    await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
+      [
+        { text: "💰 Так, оплачено все", callback_data: `paybulk:${studentId}` },
+        { text: "⏳ Ще ні", callback_data: `paybulkno:${studentId}` },
+      ],
+    ]);
+  }
+
   if (unmarkedLessons.length === 0) {
     await sendDailySummary();
     return { sent: true };
   }
 
   for (const lesson of unmarkedLessons) {
-    const { hours, minutes } = getKyivTimeParts(lesson.startAt);
-    const timeLabel = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    const dateTimeLabel = formatLessonDateTimeKyiv(lesson.startAt);
 
     const text =
-      `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} о ${timeLabel} (${lesson.price} грн)\n\n` +
+      `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} (${dateTimeLabel}, ${lesson.price} грн)\n\n` +
       `Цей урок ще не відмічено. Він відбувся?`;
 
     await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
@@ -177,18 +335,6 @@ export async function checkAndMaybeSendSummary(): Promise<void> {
   if (remaining === 0) {
     await sendDailySummary();
   }
-}
-
-function getMonthRangeUtc(year: number, monthIndex0: number): { start: Date; end: Date } {
-  let nextMonth = monthIndex0 + 1;
-  let nextYear = year;
-  if (nextMonth > 11) {
-    nextMonth = 0;
-    nextYear += 1;
-  }
-  const start = kyivWallTimeToUtc(year, monthIndex0, 1, 0, 0);
-  const end = kyivWallTimeToUtc(nextYear, nextMonth, 1, 0, 0);
-  return { start, end };
 }
 
 function isLastDayOfMonthKyiv(): boolean {
