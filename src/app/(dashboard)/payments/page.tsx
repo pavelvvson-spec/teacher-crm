@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { calculateStudentBalance } from "@/lib/payments-utils";
 import ResetPaymentsButton from "@/components/ResetPaymentsButton";
 import PayStudentButton from "@/components/PayStudentButton";
+import AddPrepaymentButton from "@/components/AddPrepaymentButton";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,22 @@ export default async function PaymentsPage() {
   const periodicDebtors = studentsWithBalance.filter(
     (s) => s.paymentFrequency && PERIODIC_FREQUENCIES.includes(s.paymentFrequency)
   );
+
+  const prepaidStudents = students
+    .filter((s) => s.paymentFrequency === "MONTHLY_PREPAID")
+    .map((student) => {
+      const balance = calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency);
+      const lessonsLeft =
+        student.defaultLessonPrice > 0 ? Math.floor(Math.abs(balance) / student.defaultLessonPrice) : 0;
+      return {
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        balance,
+        lessonsLeft,
+      };
+    })
+    .sort((a, b) => a.balance - b.balance);
 
   const totalDebt = studentsWithBalance
     .filter((s) => s.balance > 0)
@@ -66,6 +83,26 @@ export default async function PaymentsPage() {
     );
   }
 
+  function renderPrepaidRow(s: (typeof prepaidStudents)[number]) {
+    return (
+      <div key={s.id} className="flex items-center justify-between py-3">
+        <p className="font-medium text-gray-800">
+          {s.firstName} {s.lastName ?? ""}
+        </p>
+        <div className="flex items-center gap-3">
+          {s.balance > 0 ? (
+            <p className="font-semibold text-red-600">Борг: {s.balance} грн</p>
+          ) : (
+            <p className="font-semibold text-purple-700">
+              Залишилось: {Math.abs(s.balance)} грн (~{s.lessonsLeft} ур.)
+            </p>
+          )}
+          <AddPrepaymentButton studentId={s.id} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -84,7 +121,7 @@ export default async function PaymentsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-3">Поурочна оплата</h2>
           {perLessonDebtors.length === 0 ? (
@@ -103,6 +140,17 @@ export default async function PaymentsPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {periodicDebtors.map(renderStudentRow)}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Передоплата на місяць</h2>
+          {prepaidStudents.length === 0 ? (
+            <p className="text-gray-500">Немає учнів з оплатою наперед.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {prepaidStudents.map(renderPrepaidRow)}
             </div>
           )}
         </div>

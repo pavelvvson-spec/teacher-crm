@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
+import { calculateStudentBalance } from "@/lib/payments-utils";
 import {
   sendTelegramMessage,
   sendTelegramMessageWithButtons,
@@ -177,6 +178,35 @@ export async function settleStudentPeriodicPayments(
   };
 }
 
+async function sendPrepaidBalanceWarnings(teacherChatId: string): Promise<void> {
+  const prepaidStudents = await prisma.student.findMany({
+    where: { isActive: true, paymentFrequency: "MONTHLY_PREPAID" },
+    include: { lessons: true, payments: true },
+  });
+
+  for (const student of prepaidStudents) {
+    const balance = calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency);
+    const threshold = student.defaultLessonPrice;
+
+    if (threshold <= 0) continue;
+
+    if (balance >= -threshold) {
+      let text: string;
+      if (balance > 0) {
+        text =
+          `⚠️ ${student.firstName} ${student.lastName ?? ""}: передоплата вичерпана, борг ${balance} грн.\n\n` +
+          `Потрібно внести наступну оплату.`;
+      } else {
+        const lessonsLeft = Math.floor(Math.abs(balance) / threshold);
+        text =
+          `⚠️ ${student.firstName} ${student.lastName ?? ""}: залишилось передоплати на ~${lessonsLeft} урок(и) (${Math.abs(balance)} грн).\n\n` +
+          `Скоро знадобиться нова оплата.`;
+      }
+      await sendTelegramMessage(teacherChatId, text);
+    }
+  }
+}
+
 export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: string }> {
   const settings = await prisma.settings.findFirst();
 
@@ -191,7 +221,6 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
 
   const { end } = getTodayKyivRangeUtc();
 
-  // Усі ще не відмічені уроки (сьогоднішні і будь-які минулі, що лишились SCHEDULED)
   const unmarkedLessons = await prisma.lesson.findMany({
     where: {
       startAt: { lte: end },
@@ -201,7 +230,6 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
     orderBy: { startAt: "asc" },
   });
 
-  // Уроки (будь-якого дня), які вже проведені, але досі не оплачені
   const unpaidLessons = await prisma.lesson.findMany({
     where: {
       status: "COMPLETED",
@@ -262,6 +290,8 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
     ]);
   }
 
+  await sendPrepaidBalanceWarnings(settings.teacherTelegramChatId);
+
   if (unmarkedLessons.length === 0) {
     await sendDailySummary();
     return { sent: true };
@@ -269,16 +299,24 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
 
   for (const lesson of unmarkedLessons) {
     const dateTimeLabel = formatLessonDateTimeKyiv(lesson.startAt);
+    const isPrepaid = lesson.student.paymentFrequency === "MONTHLY_PREPAID";
 
     const text =
       `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} (${dateTimeLabel}, ${lesson.price} грн)\n\n` +
       `Цей урок ще не відмічено. Він відбувся?`;
 
-    await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
-      [{ text: "✅ Проведено, оплачено", callback_data: `chk:${lesson.id}:1` }],
-      [{ text: "🟡 Проведено, не оплачено", callback_data: `chk:${lesson.id}:2` }],
-      [{ text: "❌ Не відбувся", callback_data: `chk:${lesson.id}:0` }],
-    ]);
+    if (isPrepaid) {
+      await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
+        [{ text: "✅ Проведено", callback_data: `chk:${lesson.id}:3` }],
+        [{ text: "❌ Не відбувся", callback_data: `chk:${lesson.id}:0` }],
+      ]);
+    } else {
+      await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
+        [{ text: "✅ Проведено, оплачено", callback_data: `chk:${lesson.id}:1` }],
+        [{ text: "🟡 Проведено, не оплачено", callback_data: `chk:${lesson.id}:2` }],
+        [{ text: "❌ Не відбувся", callback_data: `chk:${lesson.id}:0` }],
+      ]);
+    }
   }
 
   return { sent: true };

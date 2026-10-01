@@ -38,6 +38,7 @@ enum PaymentFrequency {
   MONTHLY
   END_OF_WEEK
   END_OF_MONTH
+  MONTHLY_PREPAID
 }
 
 model Student {

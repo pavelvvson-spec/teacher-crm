@@ -26,6 +26,7 @@ const PAYMENT_FREQUENCY_LABELS: Record<string, string> = {
   MONTHLY: "Щомісячна",
   END_OF_WEEK: "В кінці тижня",
   END_OF_MONTH: "В кінці місяця",
+  MONTHLY_PREPAID: "Помісячна (оплата наперед)",
 };
 
 export default function StudentForm({ initialValues }: { initialValues?: Partial<StudentFormValues> }) {

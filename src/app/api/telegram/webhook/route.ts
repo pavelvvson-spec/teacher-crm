@@ -174,7 +174,7 @@ async function handleCallbackQuery(callbackQuery: {
   if (data.startsWith("chk:")) {
     const parts = data.split(":");
     const lessonId = parts[1];
-    const code = parts[2]; // "1" = проведено+оплачено, "2" = проведено, не оплачено, "0" = не відбувся
+    const code = parts[2]; // "1" = проведено+оплачено, "2" = проведено, не оплачено, "3" = проведено (передоплата), "0" = не відбувся
 
     const lesson = await prisma.lesson.findUnique({
       where: { id: lessonId },
@@ -196,6 +196,8 @@ async function handleCallbackQuery(callbackQuery: {
       resultLabel = "✅ Проведено, оплачено";
     } else if (code === "2") {
       resultLabel = "🟡 Проведено, не оплачено";
+    } else if (code === "3") {
+      resultLabel = "✅ Проведено (покрито передоплатою)";
     } else {
       updateData.status = "NO_SHOW";
       resultLabel = "❌ Не відбувся";

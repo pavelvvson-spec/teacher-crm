@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       amount: Number(body.amount),
       status: "PAID",
       paymentMethod: body.paymentMethod || null,
-      paidAt: new Date(),
+      paidAt: body.paidAt ? new Date(body.paidAt) : new Date(),
       comment: body.comment || null,
     },
   });
