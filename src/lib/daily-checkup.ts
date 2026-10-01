@@ -408,9 +408,16 @@ async function computeMonthStats(start: Date, end: Date) {
       l.status === "NO_SHOW"
   );
 
-  const totalEarned = completed
+  const lessonsEarned = completed
     .filter((l) => l.paymentStatus === "PAID")
     .reduce((sum, l) => sum + l.price, 0);
+
+  const payments = await prisma.payment.findMany({
+    where: { paidAt: { gte: start, lt: end }, status: "PAID" },
+  });
+  const paymentsEarned = payments.reduce((sum, p) => sum + p.amount, 0);
+
+  const totalEarned = lessonsEarned + paymentsEarned;
 
   const totalMinutes = completed.reduce((sum, l) => sum + l.duration, 0);
   const activeStudents = new Set(completed.map((l) => l.studentId)).size;

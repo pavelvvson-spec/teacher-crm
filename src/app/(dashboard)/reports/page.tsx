@@ -45,10 +45,19 @@ export default async function ReportsPage({
   const paidAmount = lessons
     .filter((l: typeof lessons[number]) => l.paymentStatus === "PAID")
     .reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
-  const unpaidAmount = totalAmount - paidAmount;
+
+  // Уроки передоплатників не вважаємо "неоплаченими" — гроші за них уже внесені наперед,
+  // просто не прив'язані до конкретного уроку.
+  const unpaidAmount = lessons
+    .filter(
+      (l: typeof lessons[number]) =>
+        l.paymentStatus !== "PAID" && l.student.paymentFrequency !== "MONTHLY_PREPAID"
+    )
+    .reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
 
   const debtorsMap = new Map<string, { name: string; amount: number }>();
   for (const lesson of lessons) {
+    if (lesson.student.paymentFrequency === "MONTHLY_PREPAID") continue;
     if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {
       const key = lesson.studentId;
       const existing = debtorsMap.get(key);
@@ -69,6 +78,7 @@ export default async function ReportsPage({
     where: {
       status: "COMPLETED",
       paymentStatus: { in: ["UNPAID", "DEBT", "PARTIALLY_PAID"] },
+      student: { paymentFrequency: { not: "MONTHLY_PREPAID" } },
     },
     include: { student: true },
     orderBy: { startAt: "asc" },
