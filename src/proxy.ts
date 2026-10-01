@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/setup-teacher", "/api/telegram/webhook"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/setup-teacher",
+  "/api/telegram/webhook",
+  "/api/cron/daily-checkup",
+  "/api/cron/daily-summary",
+];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

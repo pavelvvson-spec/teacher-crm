@@ -14,9 +14,36 @@ export default async function TelegramSettingsPage() {
     include: { student: true },
   });
 
+  const settings = await prisma.settings.findFirst();
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-800">Налаштування Telegram</h1>
+
+      <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+        <h2 className="text-lg font-semibold text-gray-800">Вечірній чекап для вчителя</h2>
+        <p className="text-gray-600 text-sm">
+          Щодня о 21:00 бот надсилає в цей чат список непідтверджених уроків за день з кнопками
+          "Проведено" / "Не відбувся", а потім — підсумок по зароблених грошах.
+        </p>
+        <p className="text-gray-600 text-sm">
+          Щоб підключити, відкрий чат з ботом у Telegram і надішли команду:
+        </p>
+        <div className="bg-gray-50 rounded-xl px-4 py-2 font-mono text-sm text-gray-800">
+          /start_teacher
+        </div>
+        <div className="pt-2">
+          {settings?.teacherTelegramChatId ? (
+            <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-lg">
+              Підключено
+            </span>
+          ) : (
+            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">
+              Не підключено
+            </span>
+          )}
+        </div>
+      </div>
 
       <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
         <h2 className="text-lg font-semibold text-gray-800">Як під'єднати учня</h2>

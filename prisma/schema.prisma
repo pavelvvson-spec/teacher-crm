@@ -178,6 +178,9 @@ model Settings {
   defaultReminder2hEnabled  Boolean  @default(true)
   timezone                  String   @default("Europe/Kyiv")
   currency                  String   @default("UAH")
+  teacherTelegramChatId     String?
+  lastCheckupSentAt         DateTime?
+  lastSummarySentAt         DateTime?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 }
