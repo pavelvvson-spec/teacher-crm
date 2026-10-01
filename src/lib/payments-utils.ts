@@ -7,13 +7,13 @@ export function calculateStudentBalance(
   payments: { amount: number; status: string }[] = [],
   paymentFrequency: string | null = null
 ): number {
-  const isPerLesson = !paymentFrequency || paymentFrequency === "PER_LESSON";
+  // paymentFrequency наразі не впливає на те, що саме потрапляє в борг —
+  // борг завжди рахується тільки за реально проведені уроки.
+  // Параметр лишили про всяк випадок на майбутнє.
+  void paymentFrequency;
 
   const lessonsBalance = lessons.reduce((total, lesson) => {
-    if (lesson.status === "CANCELLED_BY_STUDENT" || lesson.status === "CANCELLED_BY_TEACHER") {
-      return total;
-    }
-    if (isPerLesson && lesson.status !== "COMPLETED") {
+    if (lesson.status !== "COMPLETED") {
       return total;
     }
     if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {
