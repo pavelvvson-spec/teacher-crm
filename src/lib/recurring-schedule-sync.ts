@@ -108,7 +108,7 @@ export async function syncStudentLessons(
     });
   };
 
-  // Уроки, створені або перенесені вручну, при зміні графіка не скасовуємо
+  // Уроки, створені або перенесені вручну, при зміні графіка не чіпаємо
   const futureLessons = await prisma.lesson.findMany({
     where: {
       studentId,
@@ -131,25 +131,81 @@ export async function syncStudentLessons(
   }));
 
   let lessonsCancelled = 0;
-  if (staleLessonIds.length > 0) {
-    if (dryRun) {
-      lessonsCancelled = staleLessonIds.length;
-    } else {
-      await prisma.reminder.updateMany({
-        where: { lessonId: { in: staleLessonIds }, status: "PENDING" },
-        data: { status: "SKIPPED" },
-      });
+  let lessonsDeleted = 0;
 
-      const result = await prisma.lesson.updateMany({
-        where: { id: { in: staleLessonIds } },
-        data: {
-          status: "CANCELLED_BY_TEACHER",
-          cancellationReason: "Автоматично скасовано: змінено графік уроків",
-        },
-      });
-      lessonsCancelled = result.count;
+  if (staleLessons.length > 0) {
+    if (dryRun) {
+      lessonsCancelled = staleLessons.length;
+    } else {
+      for (const lesson of staleLessons) {
+        const hasPrep = Boolean(
+          lesson.teacherNotes || lesson.homework || lesson._count.materials > 0
+        );
+
+        if (!hasPrep) {
+          // Немає підготовки: видаляємо урок повністю, щоб не було сірих
+          try {
+            await prisma.reminder.deleteMany({ where: { lessonId: lesson.id } });
+            await prisma.lesson.delete({ where: { id: lesson.id } });
+            lessonsDeleted++;
+            continue;
+          } catch {
+            // Якщо не вдалося видалити, скасовуємо як раніше
+          }
+        }
+
+        await prisma.reminder.updateMany({
+          where: { lessonId: lesson.id, status: "PENDING" },
+          data: { status: "SKIPPED" },
+        });
+        await prisma.lesson.update({
+          where: { id: lesson.id },
+          data: {
+            status: "CANCELLED_BY_TEACHER",
+            cancellationReason: "Автоматично скасовано: змінено графік уроків",
+          },
+        });
+        lessonsCancelled++;
+      }
     }
   }
 
-  return { lessonsCreated, lessonsCancelled, cancelledLessons };
+  // Прибираємо вже наявні сірі майбутні уроки, які втратили актуальність
+  if (!dryRun) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const grayLessons = await prisma.lesson.findMany({
+      where: {
+        studentId,
+        status: "CANCELLED_BY_TEACHER",
+        startAt: { gte: today },
+      },
+      include: { _count: { select: { materials: true } } },
+    });
+
+    for (const lesson of grayLessons) {
+      const hasPrep = Boolean(
+        lesson.teacherNotes || lesson.homework || lesson._count.materials > 0
+      );
+      if (hasPrep) continue;
+
+      const autoCancelled = Boolean(
+        lesson.cancellationReason?.startsWith("Автоматично скасовано")
+      );
+      const outdated = !lesson.isManual && !matchesAnySchedule(lesson.startAt);
+
+      if (!autoCancelled && !outdated) continue;
+
+      try {
+        await prisma.reminder.deleteMany({ where: { lessonId: lesson.id } });
+        await prisma.lesson.delete({ where: { id: lesson.id } });
+        lessonsDeleted++;
+      } catch {
+        // Не вдалося видалити: лишаємо як є
+      }
+    }
+  }
+
+  return { lessonsCreated, lessonsCancelled, lessonsDeleted, cancelledLessons };
 }
