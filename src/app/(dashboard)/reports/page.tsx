@@ -152,6 +152,10 @@ export default async function ReportsPage({
   const allUnpaidLessons = unpaidCandidates.filter(
     (l: typeof unpaidCandidates[number]) => owedFor(l) > 0
   );
+  const allUnpaidTotal = allUnpaidLessons.reduce(
+    (sum: number, l: typeof allUnpaidLessons[number]) => sum + owedFor(l),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -283,37 +287,54 @@ export default async function ReportsPage({
         )}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-lg font-semibold text-gray-800 mb-1">Неоплачені уроки (за весь час)</h2>
-        <p className="text-sm text-gray-500 mb-3">
-          Уроки, які ще не закриті оплатами, для звірки, незалежно від обраного періоду вище. Оплати
-          закривають найстаріші уроки першими.
-        </p>
-        {allUnpaidLessons.length === 0 ? (
-          <p className="text-gray-500">Неоплачених уроків немає — усе оплачено.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {allUnpaidLessons.map((lesson: typeof allUnpaidLessons[number]) => {
-              const owed = owedFor(lesson);
-              return (
-                <div key={lesson.id} className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="font-medium text-gray-800">
-                      {lesson.student.firstName} {lesson.student.lastName ?? ""}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatLessonDateTimeKyiv(lesson.startAt)} ·{" "}
-                      {PAYMENT_STATUS_LABELS[lesson.paymentStatus] ?? lesson.paymentStatus}
-                      {owed < lesson.price && ` · частково покрито оплатою (урок ${lesson.price} грн)`}
-                    </p>
-                  </div>
-                  <p className="font-semibold text-red-600">{owed} грн</p>
-                </div>
-              );
-            })}
+      <details className="bg-white rounded-2xl shadow-sm p-5">
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Неоплачені уроки (за весь час)</h2>
+              <p className="text-xs text-pink-600">
+                {allUnpaidLessons.length === 0
+                  ? "усе оплачено"
+                  : `${allUnpaidLessons.length} ур., ${allUnpaidTotal} грн · натисни, щоб розкрити`}
+              </p>
+            </div>
+            {allUnpaidLessons.length > 0 && (
+              <p className="font-semibold text-red-600">{allUnpaidTotal} грн</p>
+            )}
           </div>
-        )}
-      </div>
+        </summary>
+
+        <div className="mt-4">
+          <p className="text-sm text-gray-500 mb-3">
+            Уроки, які ще не закриті оплатами, для звірки, незалежно від обраного періоду вище. Оплати
+            закривають найстаріші уроки першими.
+          </p>
+          {allUnpaidLessons.length === 0 ? (
+            <p className="text-gray-500">Неоплачених уроків немає — усе оплачено.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {allUnpaidLessons.map((lesson: typeof allUnpaidLessons[number]) => {
+                const owed = owedFor(lesson);
+                return (
+                  <div key={lesson.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {lesson.student.firstName} {lesson.student.lastName ?? ""}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {formatLessonDateTimeKyiv(lesson.startAt)} ·{" "}
+                        {PAYMENT_STATUS_LABELS[lesson.paymentStatus] ?? lesson.paymentStatus}
+                        {owed < lesson.price && ` · частково покрито оплатою (урок ${lesson.price} грн)`}
+                      </p>
+                    </div>
+                    <p className="font-semibold text-red-600">{owed} грн</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
