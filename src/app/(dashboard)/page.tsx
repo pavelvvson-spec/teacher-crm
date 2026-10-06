@@ -7,6 +7,8 @@ export default async function HomePage() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
   const todayLessons = await prisma.lesson.findMany({
     where: {
@@ -22,13 +24,26 @@ export default async function HomePage() {
     0
   );
 
+  const monthLessons = await prisma.lesson.findMany({
+    where: {
+      startAt: { gte: startOfMonth, lte: endOfMonth },
+      status: { in: ["SCHEDULED", "COMPLETED", "RESCHEDULED"] },
+    },
+    select: { price: true },
+  });
+
+  const monthForecast = monthLessons.reduce(
+    (sum: number, l: typeof monthLessons[number]) => sum + l.price,
+    0
+  );
+
   return (
     <div className="space-y-6">
       <div className="bg-pink-600 text-white rounded-2xl shadow-sm p-6 text-center">
         <p className="text-xl font-semibold">Сашуню, у тебе все вийде! 💪💖</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-sm text-gray-500">Уроків сьогодні</p>
           <p className="text-2xl font-semibold text-gray-800">{todayLessons.length}</p>
@@ -36,6 +51,11 @@ export default async function HomePage() {
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-sm text-gray-500">Заробиш сьогодні</p>
           <p className="text-2xl font-semibold text-green-600">{todayIncome} грн</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <p className="text-sm text-gray-500">Прогноз на місяць</p>
+          <p className="text-2xl font-semibold text-pink-600">{monthForecast} грн</p>
+          <p className="text-xs text-gray-400 mt-1">{monthLessons.length} уроків за календарем</p>
         </div>
       </div>
 

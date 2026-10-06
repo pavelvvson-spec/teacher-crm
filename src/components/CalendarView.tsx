@@ -24,6 +24,7 @@ type Student = {
   defaultLessonDuration: number;
   defaultLessonPrice: number;
   lessonFormat: string;
+  paymentFrequency: string;
 };
 
 type Lesson = {
@@ -63,6 +64,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [reschedulingLesson, setReschedulingLesson] = useState<Lesson | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
+  const [askNoShowFor, setAskNoShowFor] = useState<string | null>(null);
 
   const [showMaterials, setShowMaterials] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -144,6 +146,20 @@ export default function CalendarView({ students }: { students: Student[] }) {
   async function togglePaid(lesson: Lesson) {
     const newPaymentStatus = lesson.paymentStatus === "PAID" ? "UNPAID" : "PAID";
     await updateLessonFields(lesson, { paymentStatus: newPaymentStatus });
+  }
+
+  async function markNoShow(lesson: Lesson, charged: boolean) {
+    setAskNoShowFor(null);
+    if (charged) {
+      // Учень не прийшов, але урок оплачується: рахуємо як проведений, з приміткою
+      const noteLine = "Не з'явився, урок оплачується";
+      const teacherNotes = lesson.teacherNotes
+        ? `${lesson.teacherNotes}\n${noteLine}`
+        : noteLine;
+      await updateLessonFields(lesson, { status: "COMPLETED", teacherNotes });
+    } else {
+      await updateLessonFields(lesson, { status: "NO_SHOW" });
+    }
   }
 
   async function cancelLesson(lesson: Lesson) {
@@ -335,6 +351,12 @@ export default function CalendarView({ students }: { students: Student[] }) {
     RESCHEDULED: "bg-yellow-100 text-yellow-800",
     NO_SHOW: "bg-red-100 text-red-800",
   };
+
+  const selectedStudent = selectedLesson
+    ? students.find((s) => s.id === selectedLesson.studentId)
+    : null;
+  const isPrepaidStudent = selectedStudent?.paymentFrequency === "MONTHLY_PREPAID";
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -412,7 +434,10 @@ export default function CalendarView({ students }: { students: Student[] }) {
                     {dayLessons.map((lesson) => (
                       <button
                         key={lesson.id}
-                        onClick={() => setSelectedLesson(lesson)}
+                        onClick={() => {
+                          setAskNoShowFor(null);
+                          setSelectedLesson(lesson);
+                        }}
                         className={`w-full text-left px-2 py-1 rounded-lg text-xs ${statusColors[lesson.status]}`}
                       >
                         <p className="font-medium">{formatTime(new Date(lesson.startAt))}</p>
@@ -486,6 +511,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 onClick={() => {
                   setSelectedLesson(null);
                   setReschedulingLesson(null);
+                  setAskNoShowFor(null);
                 }}
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -498,7 +524,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
             </p>
             <p className="text-sm">
               Оплата:{" "}
-              <span className="font-medium">{PAYMENT_STATUS_LABELS[selectedLesson.paymentStatus]}</span>
+              <span className="font-medium">
+                {isPrepaidStudent
+                  ? "з передоплати за місяць"
+                  : PAYMENT_STATUS_LABELS[selectedLesson.paymentStatus]}
+              </span>
             </p>
             {selectedLesson.teacherNotes && (
               <p className="text-sm bg-pink-50 text-pink-700 rounded-lg px-3 py-2">
@@ -545,6 +575,34 @@ export default function CalendarView({ students }: { students: Student[] }) {
               </div>
             )}
 
+            {askNoShowFor === selectedLesson.id && (
+              <div className="bg-red-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-700">
+                  Учень не прийшов. Цей урок оплачується?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => markNoShow(selectedLesson, true)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                  >
+                    Так, оплачується
+                  </button>
+                  <button
+                    onClick={() => markNoShow(selectedLesson, false)}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                  >
+                    Ні, не оплачується
+                  </button>
+                  <button
+                    onClick={() => setAskNoShowFor(null)}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                  >
+                    Назад
+                  </button>
+                </div>
+              </div>
+            )}
+
             {selectedLesson.meetingLink && (
               <a href={selectedLesson.meetingLink}
                 target="_blank"
@@ -573,7 +631,13 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 Проведено
               </button>
               <button
-                onClick={() => toggleStatus(selectedLesson, "NO_SHOW")}
+                onClick={() => {
+                  if (selectedLesson.status === "NO_SHOW") {
+                    toggleStatus(selectedLesson, "NO_SHOW");
+                  } else {
+                    setAskNoShowFor(selectedLesson.id);
+                  }
+                }}
                 className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
                   selectedLesson.status === "NO_SHOW"
                     ? "bg-red-600 text-white border-red-600"
@@ -582,16 +646,18 @@ export default function CalendarView({ students }: { students: Student[] }) {
               >
                 Учень не прийшов
               </button>
-              <button
-                onClick={() => togglePaid(selectedLesson)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
-                  selectedLesson.paymentStatus === "PAID"
-                    ? "bg-pink-600 text-white border-pink-600"
-                    : "bg-pink-50 text-pink-700 border-transparent hover:bg-pink-100"
-                }`}
-              >
-                Позначити оплаченим
-              </button>
+              {!isPrepaidStudent && (
+                <button
+                  onClick={() => togglePaid(selectedLesson)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
+                    selectedLesson.paymentStatus === "PAID"
+                      ? "bg-pink-600 text-white border-pink-600"
+                      : "bg-pink-50 text-pink-700 border-transparent hover:bg-pink-100"
+                  }`}
+                >
+                  Позначити оплаченим
+                </button>
+              )}
               <button
                 onClick={() => sendReminder(selectedLesson)}
                 className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-medium hover:bg-purple-100"

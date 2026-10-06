@@ -20,6 +20,7 @@ export default async function CalendarPage() {
           defaultLessonDuration: s.defaultLessonDuration,
           defaultLessonPrice: s.defaultLessonPrice,
           lessonFormat: s.lessonFormat,
+          paymentFrequency: s.paymentFrequency,
         }))}
       />
     </div>
