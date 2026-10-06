@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { paymentMethodLabel } from "@/lib/payments-utils";
+import { paymentMethodLabel, allocatePayments } from "@/lib/payments-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +43,30 @@ export default async function ReportsPage({
   const from = params.from ? new Date(params.from) : defaultFrom;
   const to = params.to ? new Date(params.to + "T23:59:59") : defaultTo;
 
+  // Скільки кожного неоплаченого уроку вже закрито оплатами (найстаріші уроки закриваються першими)
+  const allStudents = await prisma.student.findMany({
+    include: { lessons: true, payments: true },
+  });
+  const coveredByLesson = new Map<string, number>();
+  for (const s of allStudents) {
+    const alloc = allocatePayments(s.lessons, s.payments);
+    for (const [lessonId, parts] of Object.entries(alloc.lessonParts)) {
+      coveredByLesson.set(
+        lessonId,
+        parts.reduce((sum, p) => sum + p.amount, 0)
+      );
+    }
+  }
+
+  // Скільки за урок ще не оплачено
+  function owedFor(lesson: { id: string; price: number; paymentStatus: string }): number {
+    if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {
+      const covered = coveredByLesson.get(lesson.id) ?? 0;
+      return Math.max(0, Math.round((lesson.price - covered) * 100) / 100);
+    }
+    return lesson.price;
+  }
+
   const lessons = await prisma.lesson.findMany({
     where: {
       startAt: { gte: from, lte: to },
@@ -52,42 +76,17 @@ export default async function ReportsPage({
   });
 
   const totalAmount = lessons.reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
-  const paidAmount = lessons
-    .filter((l: typeof lessons[number]) => l.paymentStatus === "PAID")
-    .reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
 
-  // Уроки передоплатників не вважаємо "неоплаченими" — гроші за них уже внесені наперед,
-  // просто не прив'язані до конкретного уроку.
-  const unpaidAmount = lessons
-    .filter(
-      (l: typeof lessons[number]) =>
-        l.paymentStatus !== "PAID" && l.student.paymentFrequency !== "MONTHLY_PREPAID"
-    )
-    .reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
-
-  const debtorsMap = new Map<string, { name: string; amount: number }>();
-  for (const lesson of lessons) {
-    if (lesson.student.paymentFrequency === "MONTHLY_PREPAID") continue;
-    if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {
-      const key = lesson.studentId;
-      const existing = debtorsMap.get(key);
-      const name = `${lesson.student.firstName} ${lesson.student.lastName ?? ""}`.trim();
-      if (existing) {
-        existing.amount += lesson.price;
-      } else {
-        debtorsMap.set(key, { name, amount: lesson.price });
-      }
-    }
-  }
-  const debtors = Array.from(debtorsMap.values());
-
-  // Список оплачених за період: уроки, позначені оплаченими, і окремі оплати
-  const paidLessons = lessons
-    .filter((l: typeof lessons[number]) => l.paymentStatus === "PAID")
-    .sort(
-      (a: typeof lessons[number], b: typeof lessons[number]) =>
-        a.startAt.getTime() - b.startAt.getTime()
-    );
+  // Уроки, позначені оплаченими, і окремі оплати за період
+  const paidFlagLessons = await prisma.lesson.findMany({
+    where: { startAt: { gte: from, lte: to }, paymentStatus: "PAID" },
+    include: { student: true },
+    orderBy: { startAt: "asc" },
+  });
+  const paidFlagTotal = paidFlagLessons.reduce(
+    (sum: number, l: typeof paidFlagLessons[number]) => sum + l.price,
+    0
+  );
 
   const periodPayments = await prisma.payment.findMany({
     where: {
@@ -108,10 +107,39 @@ export default async function ReportsPage({
     0
   );
 
+  const paidAmount = paidFlagTotal + paymentsTotal;
+
+  // Уроки передоплатників не вважаємо "неоплаченими" — гроші за них уже внесені наперед,
+  // просто не прив'язані до конкретного уроку.
+  const unpaidAmount = lessons
+    .filter(
+      (l: typeof lessons[number]) =>
+        l.paymentStatus !== "PAID" && l.student.paymentFrequency !== "MONTHLY_PREPAID"
+    )
+    .reduce((sum: number, l: typeof lessons[number]) => sum + owedFor(l), 0);
+
+  const debtorsMap = new Map<string, { name: string; amount: number }>();
+  for (const lesson of lessons) {
+    if (lesson.student.paymentFrequency === "MONTHLY_PREPAID") continue;
+    if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {
+      const owed = owedFor(lesson);
+      if (owed <= 0) continue;
+      const key = lesson.studentId;
+      const existing = debtorsMap.get(key);
+      const name = `${lesson.student.firstName} ${lesson.student.lastName ?? ""}`.trim();
+      if (existing) {
+        existing.amount += owed;
+      } else {
+        debtorsMap.set(key, { name, amount: owed });
+      }
+    }
+  }
+  const debtors = Array.from(debtorsMap.values());
+
   const fromStr = from.toISOString().slice(0, 10);
   const toStr = to.toISOString().slice(0, 10);
 
-  const allUnpaidLessons = await prisma.lesson.findMany({
+  const unpaidCandidates = await prisma.lesson.findMany({
     where: {
       status: "COMPLETED",
       paymentStatus: { in: ["UNPAID", "DEBT", "PARTIALLY_PAID"] },
@@ -120,6 +148,10 @@ export default async function ReportsPage({
     include: { student: true },
     orderBy: { startAt: "asc" },
   });
+  // Показуємо тільки те, що ще не покрито оплатами
+  const allUnpaidLessons = unpaidCandidates.filter(
+    (l: typeof unpaidCandidates[number]) => owedFor(l) > 0
+  );
 
   return (
     <div className="space-y-6">
@@ -173,39 +205,10 @@ export default async function ReportsPage({
           <div className="mt-4 space-y-5">
             <div>
               <p className="text-sm font-semibold text-gray-800 mb-1">
-                Уроки, позначені оплаченими ({paidLessons.length} шт, {paidAmount} грн)
+                Окремі оплати ({sortedPayments.length} шт, {paymentsTotal} грн)
               </p>
               <p className="text-xs text-gray-500 mb-2">
-                Для них дата оплати не зберігається, тому показана дата уроку.
-              </p>
-              {paidLessons.length === 0 ? (
-                <p className="text-sm text-gray-500">За цей період таких уроків немає.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {paidLessons.map((l: typeof paidLessons[number]) => (
-                    <div key={l.id} className="flex items-center justify-between py-2 gap-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {l.student.firstName} {l.student.lastName ?? ""}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          урок {formatLessonDateTimeKyiv(l.startAt)}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-green-600">{l.price} грн</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-800 mb-1">
-                Окремі оплати з «Історії оплат» ({sortedPayments.length} шт, {paymentsTotal} грн)
-              </p>
-              <p className="text-xs text-gray-500 mb-2">
-                Це оплати, внесені окремо (за борг, передоплата). Вони не входять у суму картки
-                «Оплачено» вище.
+                Дата це день, коли гроші надійшли.
               </p>
               {sortedPayments.length === 0 ? (
                 <p className="text-sm text-gray-500">За цей період окремих оплат немає.</p>
@@ -222,6 +225,34 @@ export default async function ReportsPage({
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-green-600">{p.amount} грн</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-1">
+                Уроки, позначені оплаченими ({paidFlagLessons.length} шт, {paidFlagTotal} грн)
+              </p>
+              <p className="text-xs text-gray-500 mb-2">
+                Для них дата оплати не зберігається, тому показана дата уроку.
+              </p>
+              {paidFlagLessons.length === 0 ? (
+                <p className="text-sm text-gray-500">За цей період таких уроків немає.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {paidFlagLessons.map((l: typeof paidFlagLessons[number]) => (
+                    <div key={l.id} className="flex items-center justify-between py-2 gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {l.student.firstName} {l.student.lastName ?? ""}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          урок {formatLessonDateTimeKyiv(l.startAt)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600">{l.price} грн</p>
                     </div>
                   ))}
                 </div>
@@ -255,26 +286,31 @@ export default async function ReportsPage({
       <div className="bg-white rounded-2xl shadow-sm p-5">
         <h2 className="text-lg font-semibold text-gray-800 mb-1">Неоплачені уроки (за весь час)</h2>
         <p className="text-sm text-gray-500 mb-3">
-          Список кожного окремого неоплаченого уроку — для звірки, незалежно від обраного періоду вище.
+          Уроки, які ще не закриті оплатами, для звірки, незалежно від обраного періоду вище. Оплати
+          закривають найстаріші уроки першими.
         </p>
         {allUnpaidLessons.length === 0 ? (
           <p className="text-gray-500">Неоплачених уроків немає — усе оплачено.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {allUnpaidLessons.map((lesson: typeof allUnpaidLessons[number]) => (
-              <div key={lesson.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-gray-800">
-                    {lesson.student.firstName} {lesson.student.lastName ?? ""}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formatLessonDateTimeKyiv(lesson.startAt)} ·{" "}
-                    {PAYMENT_STATUS_LABELS[lesson.paymentStatus] ?? lesson.paymentStatus}
-                  </p>
+            {allUnpaidLessons.map((lesson: typeof allUnpaidLessons[number]) => {
+              const owed = owedFor(lesson);
+              return (
+                <div key={lesson.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="font-medium text-gray-800">
+                      {lesson.student.firstName} {lesson.student.lastName ?? ""}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {formatLessonDateTimeKyiv(lesson.startAt)} ·{" "}
+                      {PAYMENT_STATUS_LABELS[lesson.paymentStatus] ?? lesson.paymentStatus}
+                      {owed < lesson.price && ` · частково покрито оплатою (урок ${lesson.price} грн)`}
+                    </p>
+                  </div>
+                  <p className="font-semibold text-red-600">{owed} грн</p>
                 </div>
-                <p className="font-semibold text-red-600">{lesson.price} грн</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
