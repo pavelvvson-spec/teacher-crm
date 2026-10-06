@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PaymentsHistoryButton from "@/components/PaymentsHistoryButton";
 
 type Finding = { level: "warn" | "info"; text: string };
 type Report = {
@@ -41,7 +42,7 @@ export default function MoneyCheckButton() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-40">
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
             <div className="flex justify-between items-start">
               <h2 className="text-lg font-semibold text-gray-800">Перевірка грошей</h2>
@@ -66,8 +67,8 @@ export default function MoneyCheckButton() {
             {report && report.students.length > 0 && (
               <>
                 <p className="text-sm text-gray-600">
-                  Це лише підказки, нічого не змінено. Оплати виправляй в «Історії оплат» учня, а ціни
-                  через «Змінити ціну» в його картці.
+                  Це лише підказки, нічого не змінено. Оплати виправляй кнопкою «Історія оплат» біля
+                  учня, а ціни через «Змінити ціну» в його картці.
                 </p>
                 <div className="space-y-3">
                   {report.students.map((s) => (
@@ -82,6 +83,7 @@ export default function MoneyCheckButton() {
                           {f.text}
                         </p>
                       ))}
+                      <PaymentsHistoryButton studentId={s.studentId} studentName={s.name} />
                     </div>
                   ))}
                 </div>
