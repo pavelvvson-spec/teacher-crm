@@ -8,6 +8,7 @@ type Entry = {
   kind: "lesson" | "payment";
   title: string;
   note: string;
+  coverage: string;
   delta: number;
   cash: number;
   balanceAfter: number;
@@ -119,6 +120,7 @@ export default function StudentLedgerButton({
                           <p className="text-xs text-gray-500">
                             {formatDate(e.date, e.kind === "lesson")} · {e.note}
                           </p>
+                          {e.coverage && <p className="text-xs text-blue-700">{e.coverage}</p>}
                           {e.cash > 0 && (
                             <p className="text-xs text-green-700">Надійшло: {e.cash} грн</p>
                           )}
@@ -139,8 +141,9 @@ export default function StudentLedgerButton({
                 )}
 
                 <p className="text-xs text-gray-500">
-                  Плюс означає борг, мінус означає передоплату. Уроки з позначкою «оплачено» в баланс не
-                  входять, але гроші за них показано як надходження.
+                  Плюс означає борг, мінус означає передоплату. Синім показано, яку оплату який урок закрив
+                  (спершу закриваються найстаріші). Уроки з позначкою «оплачено» в баланс не входять, але
+                  гроші за них показано як надходження.
                 </p>
               </>
             )}
