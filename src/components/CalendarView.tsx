@@ -16,6 +16,7 @@ import {
 } from "@/lib/calendar-utils";
 import LessonForm from "@/components/LessonForm";
 import CalendarResetMenu from "@/components/CalendarResetMenu";
+import CopyPrepButton from "@/components/CopyPrepButton";
 
 type Student = {
   id: string;
@@ -240,6 +241,25 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setNoteText(lesson.teacherNotes || "");
     setHomeworkText(lesson.homework || "");
     loadMaterials(lesson.id);
+  }
+
+  function handleCopied(result: { teacherNotes: string | null; homework: string | null }) {
+    if (!selectedLesson) return;
+    setNoteText(result.teacherNotes || "");
+    setHomeworkText(result.homework || "");
+    setSelectedLesson({
+      ...selectedLesson,
+      teacherNotes: result.teacherNotes,
+      homework: result.homework,
+    });
+    setLessons((prev) =>
+      prev.map((l) =>
+        l.id === selectedLesson.id
+          ? { ...l, teacherNotes: result.teacherNotes, homework: result.homework }
+          : l
+      )
+    );
+    loadMaterials(selectedLesson.id);
   }
 
   async function saveNote() {
@@ -709,6 +729,8 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 Закрити
               </button>
             </div>
+
+            <CopyPrepButton lessonId={selectedLesson.id} onCopied={handleCopied} />
 
             <div className="border-b border-gray-100 pb-4 space-y-2">
               <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>
