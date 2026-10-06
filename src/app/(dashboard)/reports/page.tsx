@@ -118,6 +118,11 @@ export default async function ReportsPage({
     )
     .reduce((sum: number, l: typeof lessons[number]) => sum + owedFor(l), 0);
 
+  // Розділення грошей, що надійшли: за уроки цього періоду і все інше
+  // (передоплати за майбутні уроки та оплати за уроки з інших періодів)
+  const paidForPeriodLessons = Math.max(0, totalAmount - unpaidAmount);
+  const paidOther = paidAmount - paidForPeriodLessons;
+
   const debtorsMap = new Map<string, { name: string; amount: number }>();
   for (const lesson of lessons) {
     if (lesson.student.paymentFrequency === "MONTHLY_PREPAID") continue;
@@ -194,19 +199,42 @@ export default async function ReportsPage({
           <p className="text-xl font-semibold text-gray-800">{lessons.length}</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-sm text-gray-500">Загальна сума</p>
+          <p className="text-sm text-gray-500">Заробіток за проведені уроки</p>
           <p className="text-xl font-semibold text-gray-800">{totalAmount} грн</p>
         </div>
 
         <details className="bg-white rounded-2xl shadow-sm p-4 open:col-span-2 sm:open:col-span-4">
           <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
             <p className="text-sm text-gray-500">
-              Оплачено <span className="text-xs text-pink-600">(натисни, щоб побачити хто)</span>
+              Надійшло грошей <span className="text-xs text-pink-600">(натисни, щоб побачити хто)</span>
             </p>
             <p className="text-xl font-semibold text-green-600">{paidAmount} грн</p>
+            <div className="mt-1 text-xs text-gray-600 space-y-0.5">
+              <p>
+                за уроки цього періоду: <span className="font-semibold">{paidForPeriodLessons} грн</span>
+              </p>
+              <p>
+                {paidOther >= 0
+                  ? "передоплати наперед і оплати за інші періоди: "
+                  : "оплачено раніше, у інших періодах: "}
+                <span className="font-semibold">{Math.abs(paidOther)} грн</span>
+              </p>
+            </div>
           </summary>
 
           <div className="mt-4 space-y-5">
+            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
+              <p>
+                «Заробіток» це вартість проведених уроків ({totalAmount} грн). «Надійшло» це гроші, які
+                реально внесли за період, разом з передоплатами за майбутні уроки.
+              </p>
+              <p>
+                Розділення по грошах рахується так: заробіток мінус неоплачене ({unpaidAmount} грн) =
+                оплачено за уроки періоду ({paidForPeriodLessons} грн). Решта це передоплата або оплата за
+                інші періоди.
+              </p>
+            </div>
+
             <div>
               <p className="text-sm font-semibold text-gray-800 mb-1">
                 Окремі оплати ({sortedPayments.length} шт, {paymentsTotal} грн)
