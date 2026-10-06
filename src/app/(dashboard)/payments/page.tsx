@@ -98,9 +98,11 @@ export default async function PaymentsPage() {
     }))
     .sort((a, b) => a.balance - b.balance);
 
-  const totalDebt = allStudentsWithBalance
+  const debtorsList = allStudentsWithBalance
     .filter((s) => s.balance > 0)
-    .reduce((sum, s) => sum + s.balance, 0);
+    .sort((a, b) => b.balance - a.balance);
+
+  const totalDebt = debtorsList.reduce((sum, s) => sum + s.balance, 0);
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -232,7 +234,21 @@ export default async function PaymentsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-sm text-gray-500 mb-1">Загальний борг</p>
-          <p className="text-2xl font-bold text-red-600">{totalDebt} грн</p>
+          <details>
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-red-600">{totalDebt} грн</span>
+              {debtorsList.length > 0 && (
+                <span className="text-sm italic text-pink-600 underline decoration-dotted">Хто?</span>
+              )}
+            </summary>
+            {debtorsList.length > 0 && (
+              <ul className="mt-2 space-y-1 text-sm text-gray-800">
+                {debtorsList.map((s) => (
+                  <li key={s.id}>{`${s.firstName} ${s.lastName ?? ""}`.trim()}</li>
+                ))}
+              </ul>
+            )}
+          </details>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-sm text-gray-500 mb-1">Оплачено за поточний місяць</p>
