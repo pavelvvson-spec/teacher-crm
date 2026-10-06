@@ -34,6 +34,7 @@ type Lesson = {
   startAt: string;
   endAt: string;
   duration: number;
+  price?: number;
   format: string;
   status: string;
   paymentStatus: string;
@@ -41,6 +42,13 @@ type Lesson = {
   teacherNotes: string | null;
   homework: string | null;
   student: { firstName: string; lastName: string | null };
+};
+
+type LessonPayment = {
+  id: string;
+  amount: number;
+  paidAt: string | null;
+  createdAt: string;
 };
 
 type Material = {
@@ -66,6 +74,9 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [askNoShowFor, setAskNoShowFor] = useState<string | null>(null);
+
+  const [lessonPayment, setLessonPayment] = useState<LessonPayment | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState(false);
 
   const [showMaterials, setShowMaterials] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -110,6 +121,29 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadLessons();
   }, [loadLessons]);
 
+  // Коли відкривається урок — дізнаємось, чи за нього вже внесена окрема оплата
+  const selectedLessonId = selectedLesson?.id ?? null;
+  useEffect(() => {
+    if (!selectedLessonId) {
+      setLessonPayment(null);
+      return;
+    }
+    let cancelled = false;
+    setLessonPayment(null);
+    fetch(`/api/payments?lessonId=${selectedLessonId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (cancelled) return;
+        setLessonPayment(Array.isArray(data) && data.length > 0 ? data[0] : null);
+      })
+      .catch(() => {
+        if (!cancelled) setLessonPayment(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedLessonId]);
+
   function goToPrevious() {
     if (viewMode === "day") setCurrentDate((d) => addDays(d, -1));
     else if (viewMode === "week") setCurrentDate((d) => addDays(d, -7));
@@ -144,9 +178,58 @@ export default function CalendarView({ students }: { students: Student[] }) {
     await updateLessonFields(lesson, { status: newStatus });
   }
 
-  async function togglePaid(lesson: Lesson) {
-    const newPaymentStatus = lesson.paymentStatus === "PAID" ? "UNPAID" : "PAID";
-    await updateLessonFields(lesson, { paymentStatus: newPaymentStatus });
+  // Знімає стару позначку «оплачено» з уроку (для старих записів)
+  async function clearPaidFlag(lesson: Lesson) {
+    await updateLessonFields(lesson, { paymentStatus: "UNPAID" });
+  }
+
+  function lessonPrice(lesson: Lesson) {
+    if (typeof lesson.price === "number" && lesson.price > 0) return lesson.price;
+    const st = students.find((s) => s.id === lesson.studentId);
+    return st?.defaultLessonPrice ?? 0;
+  }
+
+  // Внести оплату за урок: створюється окремий запис оплати з датою
+  async function payLesson(lesson: Lesson) {
+    const amount = lessonPrice(lesson);
+    if (!amount || amount <= 0) {
+      alert("У цього уроку не вказана ціна. Спочатку встанови ціну.");
+      return;
+    }
+    setPaymentBusy(true);
+    const res = await fetch("/api/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentId: lesson.studentId,
+        lessonId: lesson.id,
+        amount,
+        paidAt: new Date().toISOString(),
+      }),
+    });
+    setPaymentBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Не вдалося внести оплату");
+      return;
+    }
+    const created = await res.json();
+    setLessonPayment(created);
+  }
+
+  async function cancelLessonPayment(lesson: Lesson) {
+    if (!lessonPayment) return;
+    if (!confirm("Скасувати внесену оплату за цей урок?")) return;
+    setPaymentBusy(true);
+    const res = await fetch(`/api/payments/${lessonPayment.id}`, { method: "DELETE" });
+    setPaymentBusy(false);
+    if (!res.ok) {
+      alert("Не вдалося скасувати оплату");
+      return;
+    }
+    setLessonPayment(null);
+    setSelectedLesson({ ...lesson, paymentStatus: "UNPAID" });
+    loadLessons();
   }
 
   async function markNoShow(lesson: Lesson, charged: boolean) {
@@ -547,6 +630,10 @@ export default function CalendarView({ students }: { students: Student[] }) {
               <span className="font-medium">
                 {isPrepaidStudent
                   ? "з передоплати за місяць"
+                  : lessonPayment
+                  ? `оплачено окремою оплатою ${lessonPayment.amount} грн (${new Date(
+                      lessonPayment.paidAt || lessonPayment.createdAt
+                    ).toLocaleDateString("uk-UA")})`
                   : PAYMENT_STATUS_LABELS[selectedLesson.paymentStatus]}
               </span>
             </p>
@@ -666,16 +753,30 @@ export default function CalendarView({ students }: { students: Student[] }) {
               >
                 Учень не прийшов
               </button>
-              {!isPrepaidStudent && (
+              {!isPrepaidStudent && selectedLesson.paymentStatus === "PAID" && !lessonPayment && (
                 <button
-                  onClick={() => togglePaid(selectedLesson)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
-                    selectedLesson.paymentStatus === "PAID"
-                      ? "bg-pink-600 text-white border-pink-600"
-                      : "bg-pink-50 text-pink-700 border-transparent hover:bg-pink-100"
-                  }`}
+                  onClick={() => clearPaidFlag(selectedLesson)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium border-2 bg-pink-600 text-white border-pink-600 hover:bg-pink-700"
                 >
-                  Позначити оплаченим
+                  Зняти позначку «оплачено»
+                </button>
+              )}
+              {!isPrepaidStudent && lessonPayment && (
+                <button
+                  onClick={() => cancelLessonPayment(selectedLesson)}
+                  disabled={paymentBusy}
+                  className="px-4 py-2 rounded-xl text-sm font-medium border-2 bg-pink-600 text-white border-pink-600 hover:bg-pink-700 disabled:opacity-50"
+                >
+                  Скасувати внесену оплату
+                </button>
+              )}
+              {!isPrepaidStudent && selectedLesson.paymentStatus !== "PAID" && !lessonPayment && (
+                <button
+                  onClick={() => payLesson(selectedLesson)}
+                  disabled={paymentBusy}
+                  className="px-4 py-2 rounded-xl text-sm font-medium border-2 bg-pink-50 text-pink-700 border-transparent hover:bg-pink-100 disabled:opacity-50"
+                >
+                  Внести оплату ({lessonPrice(selectedLesson)} грн)
                 </button>
               )}
               <button
