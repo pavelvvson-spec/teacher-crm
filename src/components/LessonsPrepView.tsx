@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatTime } from "@/lib/calendar-utils";
+import CopyPrepButton from "@/components/CopyPrepButton";
 
 type Material = {
   id: string;
@@ -65,6 +66,20 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     setNoteText(lesson?.teacherNotes || "");
     setHomeworkText(lesson?.homework || "");
     loadMaterials(lessonId);
+  }
+
+  function handleCopied(result: { teacherNotes: string | null; homework: string | null }) {
+    if (!openLessonId) return;
+    setNoteText(result.teacherNotes || "");
+    setHomeworkText(result.homework || "");
+    setLessonsState((prev) =>
+      prev.map((l) =>
+        l.id === openLessonId
+          ? { ...l, teacherNotes: result.teacherNotes, homework: result.homework }
+          : l
+      )
+    );
+    loadMaterials(openLessonId);
   }
 
   async function saveNote() {
@@ -258,6 +273,8 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
                 Закрити
               </button>
             </div>
+
+            <CopyPrepButton lessonId={openLesson_.id} onCopied={handleCopied} />
 
             <div className="border-b border-gray-100 pb-4 space-y-2">
               <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>

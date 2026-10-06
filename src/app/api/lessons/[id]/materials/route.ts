@@ -81,7 +81,13 @@ export async function DELETE(request: NextRequest) {
   });
 
   if (material && (material.type === "PDF" || material.type === "IMAGE")) {
-    await del(material.url, { token: process.env.BLOB2_READ_WRITE_TOKEN }).catch(() => null);
+    // Файл видаляємо зі сховища лише якщо на нього не посилається інший урок (копії)
+    const otherUses = await prisma.lessonMaterial.count({
+      where: { url: material.url, id: { not: material.id } },
+    });
+    if (otherUses === 0) {
+      await del(material.url, { token: process.env.BLOB2_READ_WRITE_TOKEN }).catch(() => null);
+    }
   }
 
   await prisma.lessonMaterial.delete({ where: { id: body.materialId } });
