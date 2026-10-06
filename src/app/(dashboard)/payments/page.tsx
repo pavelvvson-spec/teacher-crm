@@ -5,6 +5,7 @@ import PayStudentButton from "@/components/PayStudentButton";
 import AddPrepaymentButton from "@/components/AddPrepaymentButton";
 import PaymentsHistoryButton from "@/components/PaymentsHistoryButton";
 import MoneyCheckButton from "@/components/MoneyCheckButton";
+import StudentLedgerButton from "@/components/StudentLedgerButton";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,10 @@ export default async function PaymentsPage() {
       <div key={s.id} className="flex items-center justify-between py-3 gap-2">
         <div className="space-y-1">
           <p className="font-medium text-gray-800">{fullName}</p>
-          <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+          <div className="flex gap-2 flex-wrap">
+            <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+            <StudentLedgerButton studentId={s.id} studentName={fullName} />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
@@ -93,7 +97,10 @@ export default async function PaymentsPage() {
       <div key={s.id} className="flex items-center justify-between py-3 gap-2">
         <div className="space-y-1">
           <p className="font-medium text-gray-800">{fullName}</p>
-          <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+          <div className="flex gap-2 flex-wrap">
+            <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+            <StudentLedgerButton studentId={s.id} studentName={fullName} />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {s.balance > 0 ? (
