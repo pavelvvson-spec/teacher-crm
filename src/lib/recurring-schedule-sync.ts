@@ -122,7 +122,6 @@ export async function syncStudentLessons(
   const staleLessons = futureLessons.filter(
     (lesson) => !matchesAnySchedule(lesson.startAt) && !excludeIds.has(lesson.id)
   );
-  const staleLessonIds = staleLessons.map((lesson) => lesson.id);
 
   const cancelledLessons = staleLessons.map((lesson) => ({
     id: lesson.id,
@@ -178,11 +177,22 @@ export async function syncStudentLessons(
     const grayLessons = await prisma.lesson.findMany({
       where: {
         studentId,
-        status: "CANCELLED_BY_TEACHER",
+        status: { in: ["CANCELLED_BY_TEACHER", "CANCELLED_BY_STUDENT"] },
         startAt: { gte: today },
       },
       include: { _count: { select: { materials: true } } },
     });
+
+    // Час активних (не скасованих) майбутніх уроків цього учня
+    const activeFuture = await prisma.lesson.findMany({
+      where: {
+        studentId,
+        status: { notIn: ["CANCELLED_BY_TEACHER", "CANCELLED_BY_STUDENT"] },
+        startAt: { gte: today },
+      },
+      select: { startAt: true },
+    });
+    const activeTimes = new Set(activeFuture.map((l) => l.startAt.getTime()));
 
     for (const lesson of grayLessons) {
       const hasPrep = Boolean(
@@ -193,9 +203,14 @@ export async function syncStudentLessons(
       const autoCancelled = Boolean(
         lesson.cancellationReason?.startsWith("Автоматично скасовано")
       );
-      const outdated = !lesson.isManual && !matchesAnySchedule(lesson.startAt);
+      const outdated =
+        lesson.status === "CANCELLED_BY_TEACHER" &&
+        !lesson.isManual &&
+        !matchesAnySchedule(lesson.startAt);
+      // Сірий дубль: на цей самий час уже є активний урок
+      const duplicateOfActive = activeTimes.has(lesson.startAt.getTime());
 
-      if (!autoCancelled && !outdated) continue;
+      if (!autoCancelled && !outdated && !duplicateOfActive) continue;
 
       try {
         await prisma.reminder.deleteMany({ where: { lessonId: lesson.id } });
