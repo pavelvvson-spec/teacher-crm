@@ -116,6 +116,19 @@ export default async function PaymentsPage() {
     monthLessons.reduce((sum, l) => sum + l.price, 0) +
     monthPayments.reduce((sum, p) => sum + p.amount, 0);
 
+  // Прогноз місяця (так само, як на головній): усі заплановані, проведені й перенесені уроки місяця
+  const forecastLessons = await prisma.lesson.findMany({
+    where: {
+      startAt: { gte: monthStart, lte: monthEnd },
+      status: { in: ["SCHEDULED", "COMPLETED", "RESCHEDULED"] },
+    },
+    select: { price: true },
+  });
+  const monthForecast = forecastLessons.reduce((sum, l) => sum + l.price, 0);
+  const potentialLeft = Math.max(0, monthForecast - monthIncome);
+  const receivedPercent =
+    monthForecast > 0 ? Math.min(100, Math.round((monthIncome / monthForecast) * 100)) : 0;
+
   function balanceLabel(balance: number) {
     if (balance > 0) return `Борг: ${balance} грн`;
     if (balance < 0) return `Передоплата: ${Math.abs(balance)} грн`;
@@ -216,7 +229,7 @@ export default async function PaymentsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-sm text-gray-500 mb-1">Загальний борг</p>
           <p className="text-2xl font-bold text-red-600">{totalDebt} грн</p>
@@ -224,6 +237,16 @@ export default async function PaymentsPage() {
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-sm text-gray-500 mb-1">Оплачено за поточний місяць</p>
           <p className="text-2xl font-bold text-green-600">{monthIncome} грн</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <p className="text-sm text-gray-500 mb-1">Ще може зайти за місяць</p>
+          <p className="text-2xl font-bold text-pink-600">{potentialLeft} грн</p>
+          <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full bg-green-500" style={{ width: `${receivedPercent}%` }} />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            надійшло {monthIncome} з {monthForecast} грн прогнозу ({receivedPercent}%)
+          </p>
         </div>
       </div>
 
