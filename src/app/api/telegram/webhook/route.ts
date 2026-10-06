@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   sendTelegramMessage,
+  sendTelegramMessageWithButtons,
   sendTelegramMessageWithKeyboard,
   answerTelegramCallbackQuery,
   editTelegramMessageText,
@@ -186,6 +187,32 @@ async function handleCallbackQuery(callbackQuery: {
       return;
     }
 
+    // «Не відбувся»: спочатку уточнюємо, чи оплачується цей урок
+    if (code === "0") {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Уточнюю");
+
+      if (messageId && chatId) {
+        await editTelegramMessageText(
+          chatId,
+          messageId,
+          `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n❌ Не відбувся (уточнюю оплату нижче)`
+        );
+      }
+
+      if (chatId) {
+        await sendTelegramMessageWithButtons(
+          chatId,
+          `❓ Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} (${formatLessonDateTimeKyiv(lesson.startAt)}, ${lesson.price} грн) не відбувся.\n\nЦей урок оплачується?`,
+          [
+            [{ text: "💰 Так, оплачується", callback_data: `nsw:${lessonId}:1` }],
+            [{ text: "🚫 Ні, не оплачується", callback_data: `nsw:${lessonId}:0` }],
+          ]
+        );
+      }
+
+      return;
+    }
+
     let resultLabel: string;
     const updateData: { status: "COMPLETED" | "NO_SHOW"; paymentStatus?: "PAID" } = {
       status: "COMPLETED",
@@ -216,6 +243,55 @@ async function handleCallbackQuery(callbackQuery: {
         messageId,
         `📋 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n${resultLabel}`
       );
+    }
+
+    await checkAndMaybeSendSummary();
+    return;
+  }
+
+  if (data.startsWith("nsw:")) {
+    const parts = data.split(":");
+    const lessonId = parts[1];
+    const code = parts[2]; // "1" = не з'явився, але оплачується, "0" = не оплачується
+
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: { student: true },
+    });
+
+    if (!lesson) {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Урок не знайдено");
+      return;
+    }
+
+    if (lesson.status !== "SCHEDULED") {
+      await answerTelegramCallbackQuery(callbackQuery.id, "Цей урок вже відмічено");
+      return;
+    }
+
+    const studentName = `${lesson.student.firstName} ${lesson.student.lastName ?? ""}`;
+    let resultLabel: string;
+
+    if (code === "1") {
+      const noteLine = "Не з'явився, урок оплачується";
+      const teacherNotes = lesson.teacherNotes ? `${lesson.teacherNotes}\n${noteLine}` : noteLine;
+      await prisma.lesson.update({
+        where: { id: lessonId },
+        data: { status: "COMPLETED", teacherNotes },
+      });
+      resultLabel = "💰 Не відбувся, але урок оплачується (рахується як проведений)";
+    } else {
+      await prisma.lesson.update({
+        where: { id: lessonId },
+        data: { status: "NO_SHOW" },
+      });
+      resultLabel = "🚫 Не відбувся, не оплачується";
+    }
+
+    await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
+
+    if (messageId && chatId) {
+      await editTelegramMessageText(chatId, messageId, `📋 Урок з ${studentName}\n\n${resultLabel}`);
     }
 
     await checkAndMaybeSendSummary();
