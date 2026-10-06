@@ -3,6 +3,7 @@ import { calculateStudentBalance } from "@/lib/payments-utils";
 import ResetPaymentsButton from "@/components/ResetPaymentsButton";
 import PayStudentButton from "@/components/PayStudentButton";
 import AddPrepaymentButton from "@/components/AddPrepaymentButton";
+import PaymentsHistoryButton from "@/components/PaymentsHistoryButton";
 
 export const dynamic = "force-dynamic";
 
@@ -68,11 +69,13 @@ export default async function PaymentsPage() {
     monthPayments.reduce((sum, p) => sum + p.amount, 0);
 
   function renderStudentRow(s: (typeof studentsWithBalance)[number]) {
+    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
     return (
-      <div key={s.id} className="flex items-center justify-between py-3">
-        <p className="font-medium text-gray-800">
-          {s.firstName} {s.lastName ?? ""}
-        </p>
+      <div key={s.id} className="flex items-center justify-between py-3 gap-2">
+        <div className="space-y-1">
+          <p className="font-medium text-gray-800">{fullName}</p>
+          <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+        </div>
         <div className="flex items-center gap-3">
           <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
             {s.balance > 0 ? `Борг: ${s.balance} грн` : `Передоплата: ${Math.abs(s.balance)} грн`}
@@ -84,11 +87,13 @@ export default async function PaymentsPage() {
   }
 
   function renderPrepaidRow(s: (typeof prepaidStudents)[number]) {
+    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
     return (
-      <div key={s.id} className="flex items-center justify-between py-3">
-        <p className="font-medium text-gray-800">
-          {s.firstName} {s.lastName ?? ""}
-        </p>
+      <div key={s.id} className="flex items-center justify-between py-3 gap-2">
+        <div className="space-y-1">
+          <p className="font-medium text-gray-800">{fullName}</p>
+          <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+        </div>
         <div className="flex items-center gap-3">
           {s.balance > 0 ? (
             <p className="font-semibold text-red-600">Борг: {s.balance} грн</p>
