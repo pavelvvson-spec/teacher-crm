@@ -108,13 +108,17 @@ export async function syncStudentLessons(
     });
   };
 
+  // Скасовуємо або видаляємо ТІЛЬКИ майбутні уроки: минулі не чіпаємо ніколи
+  const now = new Date();
+  const staleFrom = earliestFrom > now ? earliestFrom : now;
+
   // Уроки, створені або перенесені вручну, при зміні графіка не чіпаємо
   const futureLessons = await prisma.lesson.findMany({
     where: {
       studentId,
       status: "SCHEDULED",
       isManual: false,
-      startAt: { gte: earliestFrom },
+      startAt: { gte: staleFrom },
     },
     include: { _count: { select: { materials: true } } },
   });
@@ -142,7 +146,7 @@ export async function syncStudentLessons(
         );
 
         if (!hasPrep) {
-          // Немає підготовки: видаляємо урок повністю, щоб не було сірих
+          // Немає підготовки: видаляємо майбутній урок повністю, щоб не було сірих
           try {
             await prisma.reminder.deleteMany({ where: { lessonId: lesson.id } });
             await prisma.lesson.delete({ where: { id: lesson.id } });
