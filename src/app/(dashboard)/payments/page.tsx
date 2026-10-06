@@ -26,17 +26,20 @@ export default async function PaymentsPage() {
     balance: calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency),
   }));
 
-  const studentsWithBalance = allStudentsWithBalance
-    .filter((s) => s.balance !== 0)
+  // Колонка 1: поурочні, лише ті, у кого є борг або передоплата
+  const perLessonDebtors = allStudentsWithBalance
+    .filter(
+      (s) =>
+        (!s.paymentFrequency || s.paymentFrequency === "PER_LESSON") && s.balance !== 0
+    )
     .sort((a, b) => b.balance - a.balance);
 
-  const perLessonDebtors = studentsWithBalance.filter(
-    (s) => !s.paymentFrequency || s.paymentFrequency === "PER_LESSON"
-  );
-  const periodicDebtors = studentsWithBalance.filter(
-    (s) => s.paymentFrequency && PERIODIC_FREQUENCIES.includes(s.paymentFrequency)
-  );
+  // Колонка 2: усі помісячні / потижневі, завжди
+  const periodicStudents = allStudentsWithBalance
+    .filter((s) => s.paymentFrequency && PERIODIC_FREQUENCIES.includes(s.paymentFrequency))
+    .sort((a, b) => b.balance - a.balance);
 
+  // Колонка 3: усі, хто платить наперед, завжди
   const prepaidStudents = students
     .filter((s) => s.paymentFrequency === "MONTHLY_PREPAID")
     .map((student) => {
@@ -53,7 +56,7 @@ export default async function PaymentsPage() {
     })
     .sort((a, b) => a.balance - b.balance);
 
-  const totalDebt = studentsWithBalance
+  const totalDebt = allStudentsWithBalance
     .filter((s) => s.balance > 0)
     .reduce((sum, s) => sum + s.balance, 0);
 
@@ -71,7 +74,22 @@ export default async function PaymentsPage() {
     monthLessons.reduce((sum, l) => sum + l.price, 0) +
     monthPayments.reduce((sum, p) => sum + p.amount, 0);
 
-  function renderStudentRow(s: (typeof studentsWithBalance)[number]) {
+  function balanceLabel(balance: number) {
+    if (balance > 0) return `Борг: ${balance} грн`;
+    if (balance < 0) return `Передоплата: ${Math.abs(balance)} грн`;
+    return "Усе оплачено";
+  }
+
+  function balanceColor(balance: number) {
+    if (balance > 0) return "text-red-600";
+    if (balance < 0) return "text-pink-600";
+    return "text-green-600";
+  }
+
+  function renderStudentRow(
+    s: (typeof allStudentsWithBalance)[number],
+    alwaysShowPayButton: boolean
+  ) {
     const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
     return (
       <div key={s.id} className="flex items-center justify-between py-3 gap-2">
@@ -83,10 +101,8 @@ export default async function PaymentsPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <p className={`font-semibold ${s.balance > 0 ? "text-red-600" : "text-pink-600"}`}>
-            {s.balance > 0 ? `Борг: ${s.balance} грн` : `Передоплата: ${Math.abs(s.balance)} грн`}
-          </p>
-          {s.balance > 0 && <PayStudentButton studentId={s.id} />}
+          <p className={`font-semibold ${balanceColor(s.balance)}`}>{balanceLabel(s.balance)}</p>
+          {(alwaysShowPayButton || s.balance > 0) && <PayStudentButton studentId={s.id} />}
         </div>
       </div>
     );
@@ -119,14 +135,8 @@ export default async function PaymentsPage() {
 
   function renderAllRow(s: (typeof allStudentsWithBalance)[number]) {
     const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
-    const balanceText =
-      s.balance > 0
-        ? `Борг: ${s.balance} грн`
-        : s.balance < 0
-        ? `Передоплата: ${Math.abs(s.balance)} грн`
-        : "Баланс 0";
-    const balanceColor =
-      s.balance > 0 ? "text-red-600" : s.balance < 0 ? "text-pink-600" : "text-gray-500";
+    const text = s.balance === 0 ? "Баланс 0" : balanceLabel(s.balance);
+    const color = s.balance === 0 ? "text-gray-500" : balanceColor(s.balance);
     return (
       <div key={s.id} className="flex items-center justify-between py-3 gap-2">
         <div className="space-y-1">
@@ -136,7 +146,7 @@ export default async function PaymentsPage() {
             <StudentLedgerButton studentId={s.id} studentName={fullName} />
           </div>
         </div>
-        <p className={`font-semibold text-sm ${balanceColor}`}>{balanceText}</p>
+        <p className={`font-semibold text-sm ${color}`}>{text}</p>
       </div>
     );
   }
@@ -164,29 +174,32 @@ export default async function PaymentsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Поурочна оплата</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-1">Поурочна оплата</h2>
+          <p className="text-xs text-gray-400 mb-3">Показані ті, у кого є борг або передоплата</p>
           {perLessonDebtors.length === 0 ? (
             <p className="text-gray-500">Боргів немає — усе оплачено.</p>
           ) : (
             <div className="divide-y divide-gray-100">
-              {perLessonDebtors.map(renderStudentRow)}
+              {perLessonDebtors.map((s) => renderStudentRow(s, false))}
             </div>
           )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Помісячна / потижнева оплата</h2>
-          {periodicDebtors.length === 0 ? (
-            <p className="text-gray-500">Боргів немає — усе оплачено.</p>
+          <h2 className="text-lg font-semibold text-gray-800 mb-1">Помісячна / потижнева оплата</h2>
+          <p className="text-xs text-gray-400 mb-3">Усі учні з такою оплатою</p>
+          {periodicStudents.length === 0 ? (
+            <p className="text-gray-500">Немає учнів з такою оплатою.</p>
           ) : (
             <div className="divide-y divide-gray-100">
-              {periodicDebtors.map(renderStudentRow)}
+              {periodicStudents.map((s) => renderStudentRow(s, true))}
             </div>
           )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Передоплата на місяць</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-1">Передоплата на місяць</h2>
+          <p className="text-xs text-gray-400 mb-3">Усі учні, які платять наперед</p>
           {prepaidStudents.length === 0 ? (
             <p className="text-gray-500">Немає учнів з оплатою наперед.</p>
           ) : (
