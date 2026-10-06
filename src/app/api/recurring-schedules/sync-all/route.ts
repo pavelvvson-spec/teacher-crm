@@ -21,16 +21,22 @@ export async function POST(request: NextRequest) {
     studentId: string;
     name: string;
     created: number;
+    removedGray: number;
     cancelled: { id: string; startAt: Date; hasPrep: boolean }[];
   }[] = [];
 
   for (const student of students) {
     const result = await syncStudentLessons(student.id, new Date(), { dryRun, excludeLessonIds });
-    if (result.lessonsCreated > 0 || result.cancelledLessons.length > 0) {
+    if (
+      result.lessonsCreated > 0 ||
+      result.cancelledLessons.length > 0 ||
+      result.grayRemoved > 0
+    ) {
       report.push({
         studentId: student.id,
         name: `${student.firstName} ${student.lastName ?? ""}`.trim(),
         created: result.lessonsCreated,
+        removedGray: result.grayRemoved,
         cancelled: result.cancelledLessons,
       });
     }

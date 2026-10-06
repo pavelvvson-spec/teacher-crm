@@ -6,6 +6,7 @@ type ReportStudent = {
   studentId: string;
   name: string;
   created: number;
+  removedGray: number;
   cancelled: { id: string; startAt: string; hasPrep: boolean }[];
 };
 
@@ -123,6 +124,11 @@ export default function SyncAllSchedulesButton() {
                       {s.created > 0 && (
                         <p className="text-sm text-green-700">Буде створено уроків за розкладом: {s.created}</p>
                       )}
+                      {s.removedGray > 0 && (
+                        <p className="text-sm text-gray-700">
+                          Буде прибрано сірих (скасованих) уроків: {s.removedGray}
+                        </p>
+                      )}
                       {s.cancelled.map((c) => (
                         <label key={c.id} className="flex items-start gap-2 text-sm text-gray-700">
                           <input
@@ -132,7 +138,7 @@ export default function SyncAllSchedulesButton() {
                             className="mt-0.5"
                           />
                           <span>
-                            Скасувати урок{" "}
+                            {c.hasPrep ? "Скасувати урок" : "Прибрати урок"}{" "}
                             {new Date(c.startAt).toLocaleString("uk-UA", {
                               day: "2-digit",
                               month: "2-digit",
