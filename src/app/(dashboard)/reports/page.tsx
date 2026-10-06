@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { paymentMethodLabel } from "@/lib/payments-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,15 @@ function formatLessonDateTimeKyiv(date: Date): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  }).format(date);
+}
+
+function formatDateKyiv(date: Date): string {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "Europe/Kyiv",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(date);
 }
 
@@ -71,6 +81,33 @@ export default async function ReportsPage({
   }
   const debtors = Array.from(debtorsMap.values());
 
+  // Список оплачених за період: уроки, позначені оплаченими, і окремі оплати
+  const paidLessons = lessons
+    .filter((l: typeof lessons[number]) => l.paymentStatus === "PAID")
+    .sort(
+      (a: typeof lessons[number], b: typeof lessons[number]) =>
+        a.startAt.getTime() - b.startAt.getTime()
+    );
+
+  const periodPayments = await prisma.payment.findMany({
+    where: {
+      status: "PAID",
+      OR: [
+        { paidAt: { gte: from, lte: to } },
+        { paidAt: null, createdAt: { gte: from, lte: to } },
+      ],
+    },
+    include: { student: true },
+  });
+  const sortedPayments = periodPayments.sort(
+    (a: typeof periodPayments[number], b: typeof periodPayments[number]) =>
+      (b.paidAt ?? b.createdAt).getTime() - (a.paidAt ?? a.createdAt).getTime()
+  );
+  const paymentsTotal = sortedPayments.reduce(
+    (sum: number, p: typeof sortedPayments[number]) => sum + p.amount,
+    0
+  );
+
   const fromStr = from.toISOString().slice(0, 10);
   const toStr = to.toISOString().slice(0, 10);
 
@@ -124,10 +161,75 @@ export default async function ReportsPage({
           <p className="text-sm text-gray-500">Загальна сума</p>
           <p className="text-xl font-semibold text-gray-800">{totalAmount} грн</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-sm text-gray-500">Оплачено</p>
-          <p className="text-xl font-semibold text-green-600">{paidAmount} грн</p>
-        </div>
+
+        <details className="bg-white rounded-2xl shadow-sm p-4 open:col-span-2 sm:open:col-span-4">
+          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <p className="text-sm text-gray-500">
+              Оплачено <span className="text-xs text-pink-600">(натисни, щоб побачити хто)</span>
+            </p>
+            <p className="text-xl font-semibold text-green-600">{paidAmount} грн</p>
+          </summary>
+
+          <div className="mt-4 space-y-5">
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-1">
+                Уроки, позначені оплаченими ({paidLessons.length} шт, {paidAmount} грн)
+              </p>
+              <p className="text-xs text-gray-500 mb-2">
+                Для них дата оплати не зберігається, тому показана дата уроку.
+              </p>
+              {paidLessons.length === 0 ? (
+                <p className="text-sm text-gray-500">За цей період таких уроків немає.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {paidLessons.map((l: typeof paidLessons[number]) => (
+                    <div key={l.id} className="flex items-center justify-between py-2 gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {l.student.firstName} {l.student.lastName ?? ""}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          урок {formatLessonDateTimeKyiv(l.startAt)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600">{l.price} грн</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-gray-800 mb-1">
+                Окремі оплати з «Історії оплат» ({sortedPayments.length} шт, {paymentsTotal} грн)
+              </p>
+              <p className="text-xs text-gray-500 mb-2">
+                Це оплати, внесені окремо (за борг, передоплата). Вони не входять у суму картки
+                «Оплачено» вище.
+              </p>
+              {sortedPayments.length === 0 ? (
+                <p className="text-sm text-gray-500">За цей період окремих оплат немає.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {sortedPayments.map((p: typeof sortedPayments[number]) => (
+                    <div key={p.id} className="flex items-center justify-between py-2 gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          {p.student.firstName} {p.student.lastName ?? ""}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatDateKyiv(p.paidAt ?? p.createdAt)} · {paymentMethodLabel(p.paymentMethod)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600">{p.amount} грн</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
+
         <div className="bg-white rounded-2xl shadow-sm p-4">
           <p className="text-sm text-gray-500">Не оплачено</p>
           <p className="text-xl font-semibold text-red-600">{unpaidAmount} грн</p>
