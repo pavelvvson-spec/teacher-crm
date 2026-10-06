@@ -4,7 +4,19 @@ import { kyivWallTimeToUtc, getKyivTimeParts } from "@/lib/kyiv-time";
 
 const WEEKS_AHEAD = 8;
 
-export async function syncStudentLessons(studentId: string, fromDate?: Date) {
+type SyncOptions = {
+  dryRun?: boolean;
+  excludeLessonIds?: string[];
+};
+
+export async function syncStudentLessons(
+  studentId: string,
+  fromDate?: Date,
+  options: SyncOptions = {}
+) {
+  const dryRun = Boolean(options.dryRun);
+  const excludeIds = new Set(options.excludeLessonIds ?? []);
+
   const activeSchedules = await prisma.recurringSchedule.findMany({
     where: { studentId, isActive: true },
   });
@@ -77,7 +89,9 @@ export async function syncStudentLessons(studentId: string, fromDate?: Date) {
     );
     if (conflict) continue;
 
-    await prisma.lesson.create({ data: candidate });
+    if (!dryRun) {
+      await prisma.lesson.create({ data: candidate });
+    }
     lessonsCreated++;
   }
 
@@ -102,28 +116,40 @@ export async function syncStudentLessons(studentId: string, fromDate?: Date) {
       isManual: false,
       startAt: { gte: earliestFrom },
     },
+    include: { _count: { select: { materials: true } } },
   });
 
-  const staleLessonIds = futureLessons
-    .filter((lesson) => !matchesAnySchedule(lesson.startAt))
-    .map((lesson) => lesson.id);
+  const staleLessons = futureLessons.filter(
+    (lesson) => !matchesAnySchedule(lesson.startAt) && !excludeIds.has(lesson.id)
+  );
+  const staleLessonIds = staleLessons.map((lesson) => lesson.id);
+
+  const cancelledLessons = staleLessons.map((lesson) => ({
+    id: lesson.id,
+    startAt: lesson.startAt,
+    hasPrep: Boolean(lesson.teacherNotes || lesson.homework || lesson._count.materials > 0),
+  }));
 
   let lessonsCancelled = 0;
   if (staleLessonIds.length > 0) {
-    await prisma.reminder.updateMany({
-      where: { lessonId: { in: staleLessonIds }, status: "PENDING" },
-      data: { status: "SKIPPED" },
-    });
+    if (dryRun) {
+      lessonsCancelled = staleLessonIds.length;
+    } else {
+      await prisma.reminder.updateMany({
+        where: { lessonId: { in: staleLessonIds }, status: "PENDING" },
+        data: { status: "SKIPPED" },
+      });
 
-    const result = await prisma.lesson.updateMany({
-      where: { id: { in: staleLessonIds } },
-      data: {
-        status: "CANCELLED_BY_TEACHER",
-        cancellationReason: "Автоматично скасовано: змінено графік уроків",
-      },
-    });
-    lessonsCancelled = result.count;
+      const result = await prisma.lesson.updateMany({
+        where: { id: { in: staleLessonIds } },
+        data: {
+          status: "CANCELLED_BY_TEACHER",
+          cancellationReason: "Автоматично скасовано: змінено графік уроків",
+        },
+      });
+      lessonsCancelled = result.count;
+    }
   }
 
-  return { lessonsCreated, lessonsCancelled };
+  return { lessonsCreated, lessonsCancelled, cancelledLessons };
 }
