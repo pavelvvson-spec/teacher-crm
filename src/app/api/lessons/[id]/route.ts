@@ -24,6 +24,11 @@ export async function PUT(
   if (body.price !== undefined) data.price = Number(body.price);
 
   if (body.startAt !== undefined) {
+    const existing = await prisma.lesson.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Урок не знайдено" }, { status: 404 });
+    }
+
     const startAt = new Date(body.startAt);
     const duration = Number(body.duration) || 60;
     const endAt = new Date(startAt.getTime() + duration * 60000);
@@ -41,7 +46,10 @@ export async function PUT(
     data.startAt = startAt;
     data.duration = duration;
     data.endAt = endAt;
-    data.status = "RESCHEDULED";
+    // Перенесений урок лишається «Заплановано», щоб потрапляти у вечірній чекап
+    data.status = "SCHEDULED";
+    data.isManual = true;
+    data.originalStartAt = existing.originalStartAt ?? existing.startAt;
   }
 
   const lesson = await prisma.lesson.update({

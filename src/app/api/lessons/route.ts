@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       format: body.format,
       meetingLink: body.meetingLink || null,
       price: Number(body.price) || 0,
+      isManual: true,
     },
   });
 

@@ -49,6 +49,20 @@ export async function PUT(
 
   if (!isActive) {
     await freeUpFutureLessons(id);
+  } else {
+    // Оновлюємо ціну в майбутніх запланованих уроках і в розкладах учня (проведені не чіпаємо)
+    await prisma.lesson.updateMany({
+      where: {
+        studentId: id,
+        startAt: { gte: new Date() },
+        status: { in: ["SCHEDULED", "RESCHEDULED"] },
+      },
+      data: { price: student.defaultLessonPrice },
+    });
+    await prisma.recurringSchedule.updateMany({
+      where: { studentId: id },
+      data: { price: student.defaultLessonPrice },
+    });
   }
 
   return NextResponse.json(student);

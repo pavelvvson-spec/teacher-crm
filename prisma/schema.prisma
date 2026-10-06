@@ -91,12 +91,14 @@ model Lesson {
   duration           Int
   format             LessonFormat
   meetingLink        String?
-    status             LessonStatus @default(SCHEDULED)
+  status             LessonStatus @default(SCHEDULED)
   price              Float
   paymentStatus      PaymentStatus @default(UNPAID)
   teacherNotes       String?
   homework           String?
   cancellationReason String?
+  isManual           Boolean      @default(false)
+  originalStartAt    DateTime?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 

@@ -63,6 +63,12 @@ export async function syncStudentLessons(studentId: string, fromDate?: Date) {
     const duplicate = await findExactDuplicateLesson(candidate.studentId, candidate.startAt);
     if (duplicate) continue;
 
+    // Урок з цього слота вже перенесено вручну на інший час: не створюємо дубль
+    const movedAway = await prisma.lesson.findFirst({
+      where: { studentId: candidate.studentId, originalStartAt: candidate.startAt },
+    });
+    if (movedAway) continue;
+
     const conflict = await findConflictingLesson(
       candidate.startAt,
       candidate.endAt,
@@ -88,10 +94,12 @@ export async function syncStudentLessons(studentId: string, fromDate?: Date) {
     });
   };
 
+  // Уроки, створені або перенесені вручну, при зміні графіка не скасовуємо
   const futureLessons = await prisma.lesson.findMany({
     where: {
       studentId,
       status: "SCHEDULED",
+      isManual: false,
       startAt: { gte: earliestFrom },
     },
   });
