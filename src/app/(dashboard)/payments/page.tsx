@@ -18,14 +18,15 @@ export default async function PaymentsPage() {
     orderBy: { firstName: "asc" },
   });
 
-  const studentsWithBalance = students
-    .map((student) => ({
-      id: student.id,
-      firstName: student.firstName,
-      lastName: student.lastName,
-      paymentFrequency: student.paymentFrequency,
-      balance: calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency),
-    }))
+  const allStudentsWithBalance = students.map((student) => ({
+    id: student.id,
+    firstName: student.firstName,
+    lastName: student.lastName,
+    paymentFrequency: student.paymentFrequency,
+    balance: calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency),
+  }));
+
+  const studentsWithBalance = allStudentsWithBalance
     .filter((s) => s.balance !== 0)
     .sort((a, b) => b.balance - a.balance);
 
@@ -116,6 +117,30 @@ export default async function PaymentsPage() {
     );
   }
 
+  function renderAllRow(s: (typeof allStudentsWithBalance)[number]) {
+    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
+    const balanceText =
+      s.balance > 0
+        ? `Борг: ${s.balance} грн`
+        : s.balance < 0
+        ? `Передоплата: ${Math.abs(s.balance)} грн`
+        : "Баланс 0";
+    const balanceColor =
+      s.balance > 0 ? "text-red-600" : s.balance < 0 ? "text-pink-600" : "text-gray-500";
+    return (
+      <div key={s.id} className="flex items-center justify-between py-3 gap-2">
+        <div className="space-y-1">
+          <p className="font-medium text-gray-800">{fullName}</p>
+          <div className="flex gap-2 flex-wrap">
+            <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+            <StudentLedgerButton studentId={s.id} studentName={fullName} />
+          </div>
+        </div>
+        <p className={`font-semibold text-sm ${balanceColor}`}>{balanceText}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -169,6 +194,16 @@ export default async function PaymentsPage() {
               {prepaidStudents.map(renderPrepaidRow)}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">Усі учні</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Тут є всі активні учні, навіть з нульовим балансом. Натисни «Журнал», щоб побачити всі уроки й оплати.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 divide-y md:divide-y-0 divide-gray-100">
+          {allStudentsWithBalance.map(renderAllRow)}
         </div>
       </div>
     </div>
