@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ChangePriceButton from "@/components/ChangePriceButton";
 
 type StudentFormValues = {
   id?: string;
@@ -189,13 +190,31 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Вартість уроку (грн)</label>
-          <input
-            type="number"
-            min={0}
-            value={values.defaultLessonPrice}
-            onChange={(e) => setValues({ ...values, defaultLessonPrice: Number(e.target.value) })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
+          {isEditing ? (
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={values.defaultLessonPrice}
+                className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl text-gray-700"
+              />
+              <ChangePriceButton
+                studentId={initialValues!.id!}
+                currentPrice={values.defaultLessonPrice}
+                onDone={(newPrice) => {
+                  setValues((prev) => ({ ...prev, defaultLessonPrice: newPrice }));
+                  router.refresh();
+                }}
+              />
+            </div>
+          ) : (
+            <input
+              type="number"
+              min={0}
+              value={values.defaultLessonPrice}
+              onChange={(e) => setValues({ ...values, defaultLessonPrice: Number(e.target.value) })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Тип оплати</label>
