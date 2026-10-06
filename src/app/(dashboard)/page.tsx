@@ -3,6 +3,14 @@ import { formatTime } from "@/lib/calendar-utils";
 
 export const dynamic = "force-dynamic";
 
+function formatHours(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  if (hours === 0) return `${minutes} хв`;
+  if (minutes === 0) return `${hours} год`;
+  return `${hours} год ${minutes} хв`;
+}
+
 export default async function HomePage() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -29,11 +37,16 @@ export default async function HomePage() {
       startAt: { gte: startOfMonth, lte: endOfMonth },
       status: { in: ["SCHEDULED", "COMPLETED", "RESCHEDULED"] },
     },
-    select: { price: true },
+    select: { price: true, duration: true },
   });
 
   const monthForecast = monthLessons.reduce(
     (sum: number, l: typeof monthLessons[number]) => sum + l.price,
+    0
+  );
+
+  const monthMinutes = monthLessons.reduce(
+    (sum: number, l: typeof monthLessons[number]) => sum + l.duration,
     0
   );
 
@@ -56,6 +69,7 @@ export default async function HomePage() {
           <p className="text-sm text-gray-500">Прогноз на місяць</p>
           <p className="text-2xl font-semibold text-pink-600">{monthForecast} грн</p>
           <p className="text-xs text-gray-400 mt-1">{monthLessons.length} уроків за календарем</p>
+          <p className="text-xs text-gray-500 mt-0.5">≈ {formatHours(monthMinutes)} роботи</p>
         </div>
       </div>
 
