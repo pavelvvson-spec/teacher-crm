@@ -109,6 +109,24 @@ export default async function ReportsPage({
 
   const paidAmount = paidFlagTotal + paymentsTotal;
 
+  // Зведення по учнях: скільки кожен учень сплатив за період (окремі оплати + позначені уроки)
+  const perStudentMap = new Map<string, { name: string; payments: number; flagged: number }>();
+  for (const p of sortedPayments) {
+    const name = `${p.student.firstName} ${p.student.lastName ?? ""}`.trim();
+    const entry = perStudentMap.get(p.studentId) ?? { name, payments: 0, flagged: 0 };
+    entry.payments += p.amount;
+    perStudentMap.set(p.studentId, entry);
+  }
+  for (const l of paidFlagLessons) {
+    const name = `${l.student.firstName} ${l.student.lastName ?? ""}`.trim();
+    const entry = perStudentMap.get(l.studentId) ?? { name, payments: 0, flagged: 0 };
+    entry.flagged += l.price;
+    perStudentMap.set(l.studentId, entry);
+  }
+  const perStudent = Array.from(perStudentMap.values())
+    .map((x) => ({ ...x, total: x.payments + x.flagged }))
+    .sort((a, b) => b.total - a.total);
+
   // Уроки передоплатників не вважаємо "неоплаченими" — гроші за них уже внесені наперед,
   // просто не прив'язані до конкретного уроку.
   const unpaidAmount = lessons
@@ -236,6 +254,37 @@ export default async function ReportsPage({
             </div>
 
             <div>
+              <p className="text-sm font-semibold text-gray-800 mb-1">Зведення по учнях</p>
+              <p className="text-xs text-gray-500 mb-2">
+                Скільки кожен учень сплатив за період: окремі оплати плюс уроки, позначені оплаченими. Зручно
+                звіряти зі своїми записами.
+              </p>
+              {perStudent.length === 0 ? (
+                <p className="text-sm text-gray-500">За цей період надходжень немає.</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {perStudent.map((s) => (
+                    <div key={s.name} className="flex items-center justify-between py-2 gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {s.payments > 0 && `окремі оплати ${s.payments} грн`}
+                          {s.payments > 0 && s.flagged > 0 && " + "}
+                          {s.flagged > 0 && `позначені уроки ${s.flagged} грн`}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-green-600">{s.total} грн</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between py-2 gap-2">
+                    <p className="text-sm font-semibold text-gray-800">Разом</p>
+                    <p className="text-sm font-bold text-green-700">{paidAmount} грн</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
               <p className="text-sm font-semibold text-gray-800 mb-1">
                 Окремі оплати ({sortedPayments.length} шт, {paymentsTotal} грн)
               </p>
@@ -254,6 +303,7 @@ export default async function ReportsPage({
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatDateKyiv(p.paidAt ?? p.createdAt)} · {paymentMethodLabel(p.paymentMethod)}
+                          {p.comment ? ` · ${p.comment}` : ""}
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-green-600">{p.amount} грн</p>
