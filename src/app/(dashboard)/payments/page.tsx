@@ -4,6 +4,7 @@ import ResetPaymentsButton from "@/components/ResetPaymentsButton";
 import PayStudentButton from "@/components/PayStudentButton";
 import AddPrepaymentButton from "@/components/AddPrepaymentButton";
 import PaymentsHistoryButton from "@/components/PaymentsHistoryButton";
+import MoneyCheckButton from "@/components/MoneyCheckButton";
 
 export const dynamic = "force-dynamic";
 
@@ -110,9 +111,12 @@ export default async function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-800">Оплати</h1>
-        <ResetPaymentsButton />
+        <div className="flex items-center gap-2">
+          <MoneyCheckButton />
+          <ResetPaymentsButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
