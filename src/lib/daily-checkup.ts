@@ -121,23 +121,52 @@ function getPeriodRangeForLesson(
 type UnpaidLesson = {
   id: string;
   price: number;
+  startAt: Date;
 };
+
+// Неоплачені уроки, які ще справді потрібно оплатити.
+// Береться борг учня (баланс з урахуванням усіх окремих оплат). Найстаріші уроки
+// вважаються покритими оплатами, лишаються найновіші.
+async function getOutstandingUnpaidLessons(studentId: string): Promise<UnpaidLesson[]> {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: { lessons: true, payments: true },
+  });
+  if (!student) return [];
+
+  const balance = calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency);
+  if (balance <= 0) return [];
+
+  const unpaid = student.lessons
+    .filter(
+      (l) =>
+        l.status === "COMPLETED" &&
+        (l.paymentStatus === "UNPAID" ||
+          l.paymentStatus === "DEBT" ||
+          l.paymentStatus === "PARTIALLY_PAID")
+    )
+    .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
+
+  const result: UnpaidLesson[] = [];
+  let covered = 0;
+  for (const lesson of unpaid) {
+    if (covered >= balance) break;
+    result.push({ id: lesson.id, price: lesson.price, startAt: lesson.startAt });
+    covered += lesson.price;
+  }
+
+  return result.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+}
 
 async function getReadyPeriodicUnpaidLessons(
   studentId: string,
   paymentFrequency: string | null
 ): Promise<UnpaidLesson[]> {
-  const unpaidLessons = await prisma.lesson.findMany({
-    where: {
-      studentId,
-      status: "COMPLETED",
-      paymentStatus: { in: ["UNPAID", "DEBT", "PARTIALLY_PAID"] },
-    },
-  });
+  const outstanding = await getOutstandingUnpaidLessons(studentId);
 
   const ready: UnpaidLesson[] = [];
 
-  for (const lesson of unpaidLessons) {
+  for (const lesson of outstanding) {
     const { start: periodStart, end: periodEnd } = getPeriodRangeForLesson(lesson, paymentFrequency);
     const remainingScheduled = await prisma.lesson.count({
       where: {
@@ -148,13 +177,16 @@ async function getReadyPeriodicUnpaidLessons(
     });
 
     if (remainingScheduled === 0) {
-      ready.push({ id: lesson.id, price: lesson.price });
+      ready.push(lesson);
     }
   }
 
   return ready;
 }
 
+// «Оплачено все»: створюється одна окрема оплата на суму неоплачених уроків.
+// Позначки на уроках не ставляться. Повторне натискання нічого не додасть,
+// бо після оплати борг уже 0.
 export async function settleStudentPeriodicPayments(
   studentId: string
 ): Promise<{ count: number; total: number; studentName: string } | null> {
@@ -164,10 +196,15 @@ export async function settleStudentPeriodicPayments(
   const readyLessons = await getReadyPeriodicUnpaidLessons(studentId, student.paymentFrequency);
   const total = readyLessons.reduce((sum, l) => sum + l.price, 0);
 
-  if (readyLessons.length > 0) {
-    await prisma.lesson.updateMany({
-      where: { id: { in: readyLessons.map((l) => l.id) } },
-      data: { paymentStatus: "PAID" },
+  if (readyLessons.length > 0 && total > 0) {
+    await prisma.payment.create({
+      data: {
+        studentId,
+        amount: total,
+        status: "PAID",
+        paidAt: new Date(),
+        comment: `Оплата за період: ${readyLessons.length} ур. (Telegram)`,
+      },
     });
   }
 
@@ -251,18 +288,28 @@ export async function sendDailyCheckup(): Promise<{ sent: boolean; reason?: stri
     (l) => l.student.paymentFrequency && PERIODIC_FREQUENCIES.includes(l.student.paymentFrequency)
   );
 
-  for (const lesson of perLessonUnpaid) {
-    const dateLabel = formatLessonDateTimeKyiv(lesson.startAt);
-    const text =
-      `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} (${dateLabel}, ${lesson.price} грн) ще не оплачено.\n\n` +
-      `Оплатили?`;
+  // Поурочні: питаємо лише про уроки, які ще справді не покриті оплатами
+  const perLessonStudentIds = Array.from(new Set(perLessonUnpaid.map((l) => l.studentId)));
 
-    await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
-      [
-        { text: "💰 Так, оплачено", callback_data: `pay:${lesson.id}:1` },
-        { text: "⏳ Ще ні", callback_data: `pay:${lesson.id}:0` },
-      ],
-    ]);
+  for (const studentId of perLessonStudentIds) {
+    const outstanding = await getOutstandingUnpaidLessons(studentId);
+
+    for (const outLesson of outstanding) {
+      const lesson = perLessonUnpaid.find((l) => l.id === outLesson.id);
+      if (!lesson) continue;
+
+      const dateLabel = formatLessonDateTimeKyiv(lesson.startAt);
+      const text =
+        `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""} (${dateLabel}, ${lesson.price} грн) ще не оплачено.\n\n` +
+        `Оплатили?`;
+
+      await sendTelegramMessageWithButtons(settings.teacherTelegramChatId, text, [
+        [
+          { text: "💰 Так, оплачено", callback_data: `pay:${lesson.id}:1` },
+          { text: "⏳ Ще ні", callback_data: `pay:${lesson.id}:0` },
+        ],
+      ]);
+    }
   }
 
   const periodicStudentIds = Array.from(new Set(periodicUnpaid.map((l) => l.studentId)));
