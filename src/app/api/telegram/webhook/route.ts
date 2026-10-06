@@ -21,6 +21,42 @@ function formatLessonDateTimeKyiv(date: Date): string {
   }).format(date);
 }
 
+// Фіксує оплату за урок як окремий запис оплати (з датою).
+// Нічого не робить, якщо за цей урок гроші вже враховані (позначка або оплата).
+async function recordLessonPayment(lesson: {
+  id: string;
+  studentId: string;
+  price: number;
+  paymentStatus: string;
+}) {
+  if (lesson.paymentStatus === "PAID") return;
+
+  const existing = await prisma.payment.findFirst({
+    where: { lessonId: lesson.id, status: "PAID" },
+  });
+  if (existing) return;
+
+  if (!lesson.price || lesson.price <= 0) {
+    // Ціни немає — запасний варіант: стара позначка на уроці
+    await prisma.lesson.update({
+      where: { id: lesson.id },
+      data: { paymentStatus: "PAID" },
+    });
+    return;
+  }
+
+  await prisma.payment.create({
+    data: {
+      studentId: lesson.studentId,
+      lessonId: lesson.id,
+      amount: lesson.price,
+      status: "PAID",
+      paidAt: new Date(),
+      comment: "Через Telegram",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
 
@@ -214,12 +250,11 @@ async function handleCallbackQuery(callbackQuery: {
     }
 
     let resultLabel: string;
-    const updateData: { status: "COMPLETED" | "NO_SHOW"; paymentStatus?: "PAID" } = {
+    const updateData: { status: "COMPLETED" | "NO_SHOW" } = {
       status: "COMPLETED",
     };
 
     if (code === "1") {
-      updateData.paymentStatus = "PAID";
       resultLabel = "✅ Проведено, оплачено";
     } else if (code === "2") {
       resultLabel = "🟡 Проведено, не оплачено";
@@ -234,6 +269,11 @@ async function handleCallbackQuery(callbackQuery: {
       where: { id: lessonId },
       data: updateData,
     });
+
+    // «Оплачено» тепер створює окрему оплату з датою (без подвоєння)
+    if (code === "1") {
+      await recordLessonPayment(lesson);
+    }
 
     await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
 
@@ -314,10 +354,8 @@ async function handleCallbackQuery(callbackQuery: {
     }
 
     if (code === "1") {
-      await prisma.lesson.update({
-        where: { id: lessonId },
-        data: { paymentStatus: "PAID" },
-      });
+      // Окрема оплата з датою замість позначки на уроці
+      await recordLessonPayment(lesson);
 
       await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
 
