@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { calculateStudentBalance, allocatePayments } from "@/lib/payments-utils";
+import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 import ResetPaymentsButton from "@/components/ResetPaymentsButton";
 import AddPaymentButton from "@/components/AddPaymentButton";
 import PaymentsHistoryButton from "@/components/PaymentsHistoryButton";
@@ -24,6 +25,32 @@ function kyivTime(date: Date): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+// Межі поточного місяця за київським часом (сервер Vercel працює за UTC)
+function getKyivMonthRange(now: Date): { start: Date; end: Date } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const map: Record<string, string> = {};
+  for (const p of parts) map[p.type] = p.value;
+
+  const year = Number(map.year);
+  const month = Number(map.month) - 1;
+
+  let nextMonth = month + 1;
+  let nextYear = year;
+  if (nextMonth > 11) {
+    nextMonth = 0;
+    nextYear += 1;
+  }
+
+  return {
+    start: kyivWallTimeToUtc(year, month, 1, 0, 0),
+    end: kyivWallTimeToUtc(nextYear, nextMonth, 1, 0, 0),
+  };
 }
 
 export default async function PaymentsPage() {
@@ -104,15 +131,13 @@ export default async function PaymentsPage() {
 
   const totalDebt = debtorsList.reduce((sum, s) => sum + s.balance, 0);
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const { start: monthStart, end: monthEnd } = getKyivMonthRange(new Date());
 
   const monthLessons = await prisma.lesson.findMany({
-    where: { startAt: { gte: monthStart, lte: monthEnd }, paymentStatus: "PAID" },
+    where: { startAt: { gte: monthStart, lt: monthEnd }, paymentStatus: "PAID" },
   });
   const monthPayments = await prisma.payment.findMany({
-    where: { paidAt: { gte: monthStart, lte: monthEnd }, status: "PAID" },
+    where: { paidAt: { gte: monthStart, lt: monthEnd }, status: "PAID" },
   });
   const monthIncome =
     monthLessons.reduce((sum, l) => sum + l.price, 0) +
@@ -121,7 +146,7 @@ export default async function PaymentsPage() {
   // Прогноз місяця (так само, як на головній): усі заплановані, проведені й перенесені уроки місяця
   const forecastLessons = await prisma.lesson.findMany({
     where: {
-      startAt: { gte: monthStart, lte: monthEnd },
+      startAt: { gte: monthStart, lt: monthEnd },
       status: { in: ["SCHEDULED", "COMPLETED", "RESCHEDULED"] },
     },
     select: { price: true },

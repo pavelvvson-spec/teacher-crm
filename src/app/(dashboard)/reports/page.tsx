@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { paymentMethodLabel, allocatePayments } from "@/lib/payments-utils";
+import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,39 @@ function formatDateKyiv(date: Date): string {
   }).format(date);
 }
 
+type Ymd = { y: number; m: number; d: number }; // m: 0..11
+
+// Сьогоднішня дата за Києвом
+function kyivToday(): Ymd {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const map: Record<string, string> = {};
+  for (const p of parts) map[p.type] = p.value;
+  return { y: Number(map.year), m: Number(map.month) - 1, d: Number(map.day) };
+}
+
+// "2026-10-01" -> { y: 2026, m: 9, d: 1 }
+function parseYmd(value: string | undefined): Ymd | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  return { y: Number(match[1]), m: Number(match[2]) - 1, d: Number(match[3]) };
+}
+
+// Нормалізує дату (наприклад, 32 жовтня -> 1 листопада)
+function normalizeYmd(y: number, m: number, d: number): Ymd {
+  const dt = new Date(Date.UTC(y, m, d));
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth(), d: dt.getUTCDate() };
+}
+
+function ymdToString(v: Ymd): string {
+  return `${v.y}-${String(v.m + 1).padStart(2, "0")}-${String(v.d).padStart(2, "0")}`;
+}
+
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
   UNPAID: "Не оплачено",
   DEBT: "Борг",
@@ -36,12 +70,18 @@ export default async function ReportsPage({
 }) {
   const params = await searchParams;
 
-  const now = new Date();
-  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-  const defaultTo = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  // Період за київським часом: за замовчуванням поточний місяць
+  const today = kyivToday();
+  const defaultFromYmd: Ymd = { y: today.y, m: today.m, d: 1 };
+  const defaultToYmd: Ymd = normalizeYmd(today.y, today.m + 1, 0); // останній день місяця
 
-  const from = params.from ? new Date(params.from) : defaultFrom;
-  const to = params.to ? new Date(params.to + "T23:59:59") : defaultTo;
+  const fromYmd = parseYmd(params.from) ?? defaultFromYmd;
+  const toYmd = parseYmd(params.to) ?? defaultToYmd;
+  const dayAfterTo = normalizeYmd(toYmd.y, toYmd.m, toYmd.d + 1);
+
+  // from: початок першого дня; to: початок дня ПІСЛЯ останнього (не включно)
+  const from = kyivWallTimeToUtc(fromYmd.y, fromYmd.m, fromYmd.d, 0, 0);
+  const to = kyivWallTimeToUtc(dayAfterTo.y, dayAfterTo.m, dayAfterTo.d, 0, 0);
 
   // Скільки кожного неоплаченого уроку вже закрито оплатами (найстаріші уроки закриваються першими)
   const allStudents = await prisma.student.findMany({
@@ -69,7 +109,7 @@ export default async function ReportsPage({
 
   const lessons = await prisma.lesson.findMany({
     where: {
-      startAt: { gte: from, lte: to },
+      startAt: { gte: from, lt: to },
       status: "COMPLETED",
     },
     include: { student: true },
@@ -79,7 +119,7 @@ export default async function ReportsPage({
 
   // Уроки, позначені оплаченими, і окремі оплати за період
   const paidFlagLessons = await prisma.lesson.findMany({
-    where: { startAt: { gte: from, lte: to }, paymentStatus: "PAID" },
+    where: { startAt: { gte: from, lt: to }, paymentStatus: "PAID" },
     include: { student: true },
     orderBy: { startAt: "asc" },
   });
@@ -92,8 +132,8 @@ export default async function ReportsPage({
     where: {
       status: "PAID",
       OR: [
-        { paidAt: { gte: from, lte: to } },
-        { paidAt: null, createdAt: { gte: from, lte: to } },
+        { paidAt: { gte: from, lt: to } },
+        { paidAt: null, createdAt: { gte: from, lt: to } },
       ],
     },
     include: { student: true },
@@ -159,8 +199,8 @@ export default async function ReportsPage({
   }
   const debtors = Array.from(debtorsMap.values());
 
-  const fromStr = from.toISOString().slice(0, 10);
-  const toStr = to.toISOString().slice(0, 10);
+  const fromStr = ymdToString(fromYmd);
+  const toStr = ymdToString(toYmd);
 
   const unpaidCandidates = await prisma.lesson.findMany({
     where: {
