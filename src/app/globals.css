@@ -20,3 +20,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+body {
+  padding-top: env(safe-area-inset-top);
+}
