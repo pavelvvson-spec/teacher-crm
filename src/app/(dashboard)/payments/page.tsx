@@ -168,82 +168,59 @@ export default async function PaymentsPage() {
     return "text-green-600";
   }
 
-  function renderButtons(s: Row) {
+  // Рядок учня у два поверхи:
+  // зверху ім'я і сума, знизу всі кнопки (Історія, Журнал, Внести оплату)
+  function renderRowLayout(s: Row, amountNode: React.ReactNode) {
     const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
     return (
-      <div className="flex gap-2 flex-wrap">
-        <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
-        <StudentLedgerButton studentId={s.id} studentName={fullName} />
+      <div key={s.id} className="py-3 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <p className="font-medium text-gray-800">{fullName}</p>
+          <div className="text-right shrink-0">{amountNode}</div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
+          <StudentLedgerButton studentId={s.id} studentName={fullName} />
+          <AddPaymentButton
+            studentId={s.id}
+            studentName={fullName}
+            lessons={s.unpaidLessons}
+            lessonPrice={s.isPerLesson ? s.defaultLessonPrice : 0}
+          />
+        </div>
       </div>
-    );
-  }
-
-  function renderPayButton(s: Row) {
-    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
-    return (
-      <AddPaymentButton
-        studentId={s.id}
-        studentName={fullName}
-        lessons={s.unpaidLessons}
-        lessonPrice={s.isPerLesson ? s.defaultLessonPrice : 0}
-      />
     );
   }
 
   function renderStudentRow(s: Row) {
-    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
-    return (
-      <div key={s.id} className="flex items-center justify-between py-3 gap-2">
-        <div className="space-y-1">
-          <p className="font-medium text-gray-800">{fullName}</p>
-          {renderButtons(s)}
-        </div>
-        <div className="flex items-center gap-3">
-          <p className={`font-semibold ${balanceColor(s.balance)}`}>{balanceLabel(s.balance)}</p>
-          {renderPayButton(s)}
-        </div>
-      </div>
+    return renderRowLayout(
+      s,
+      <p className={`font-semibold text-sm sm:text-base ${balanceColor(s.balance)}`}>
+        {balanceLabel(s.balance)}
+      </p>
     );
   }
 
   function renderPrepaidRow(s: (typeof prepaidStudents)[number]) {
-    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
-    return (
-      <div key={s.id} className="flex items-center justify-between py-3 gap-2">
-        <div className="space-y-1">
-          <p className="font-medium text-gray-800">{fullName}</p>
-          {renderButtons(s)}
-        </div>
-        <div className="flex items-center gap-3">
-          {s.balance > 0 ? (
-            <p className="font-semibold text-red-600">Борг: {s.balance} грн</p>
-          ) : (
-            <p className="font-semibold text-purple-700">
-              Залишилось: {Math.abs(s.balance)} грн (~{s.lessonsLeft} ур.)
-            </p>
-          )}
-          {renderPayButton(s)}
-        </div>
-      </div>
+    return renderRowLayout(
+      s,
+      s.balance > 0 ? (
+        <p className="font-semibold text-sm sm:text-base text-red-600">Борг: {s.balance} грн</p>
+      ) : (
+        <>
+          <p className="font-semibold text-sm sm:text-base text-purple-700">
+            Залишилось: {Math.abs(s.balance)} грн
+          </p>
+          <p className="text-xs text-purple-500">~{s.lessonsLeft} ур.</p>
+        </>
+      )
     );
   }
 
   function renderAllRow(s: Row) {
-    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
     const text = s.balance === 0 ? "Баланс 0" : balanceLabel(s.balance);
     const color = s.balance === 0 ? "text-gray-500" : balanceColor(s.balance);
-    return (
-      <div key={s.id} className="flex items-center justify-between py-3 gap-2">
-        <div className="space-y-1">
-          <p className="font-medium text-gray-800">{fullName}</p>
-          {renderButtons(s)}
-        </div>
-        <div className="flex items-center gap-3">
-          <p className={`font-semibold text-sm ${color}`}>{text}</p>
-          {renderPayButton(s)}
-        </div>
-      </div>
-    );
+    return renderRowLayout(s, <p className={`font-semibold text-sm ${color}`}>{text}</p>);
   }
 
   return (
