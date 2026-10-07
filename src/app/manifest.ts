@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Облік учнів, уроків і оплат",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#2563eb",
+    background_color: "#fdf2f8",
+    theme_color: "#fdf2f8",
     lang: "uk",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
