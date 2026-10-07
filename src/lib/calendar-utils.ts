@@ -43,8 +43,13 @@ export function formatMonthYear(date: Date): string {
   return `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+// Час завжди за Києвом, незалежно від того, де працює код (сервер Vercel чи телефон)
 export function formatTime(date: Date): string {
-  return date.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("uk-UA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Kyiv",
+  });
 }
 
 export const LESSON_STATUS_LABELS: Record<string, string> = {
