@@ -8,6 +8,7 @@ import {
   editTelegramMessageText,
 } from "@/lib/telegram";
 import { checkAndMaybeSendSummary, settleStudentPeriodicPayments } from "@/lib/daily-checkup";
+import { calculateStudentBalance } from "@/lib/payments-utils";
 
 const HOMEWORK_BUTTON_TEXT = "📚 Отримати домашнє завдання";
 
@@ -21,20 +22,25 @@ function formatLessonDateTimeKyiv(date: Date): string {
   }).format(date);
 }
 
+type RecordResult = "created" | "already";
+
 // Фіксує оплату за урок як окремий запис оплати (з датою).
-// Нічого не робить, якщо за цей урок гроші вже враховані (позначка або оплата).
+// Нічого не створює, якщо гроші за цей урок уже враховані:
+// - урок має стару позначку «оплачено»;
+// - є оплата, прив'язана до цього уроку;
+// - баланс учня вже покриває цей урок (наприклад, оплату внесли вручну на сторінці «Оплати»).
 async function recordLessonPayment(lesson: {
   id: string;
   studentId: string;
   price: number;
   paymentStatus: string;
-}) {
-  if (lesson.paymentStatus === "PAID") return;
+}): Promise<RecordResult> {
+  if (lesson.paymentStatus === "PAID") return "already";
 
   const existing = await prisma.payment.findFirst({
     where: { lessonId: lesson.id, status: "PAID" },
   });
-  if (existing) return;
+  if (existing) return "already";
 
   if (!lesson.price || lesson.price <= 0) {
     // Ціни немає — запасний варіант: стара позначка на уроці
@@ -42,19 +48,36 @@ async function recordLessonPayment(lesson: {
       where: { id: lesson.id },
       data: { paymentStatus: "PAID" },
     });
-    return;
+    return "created";
   }
+
+  // Перевіряємо загальний баланс учня (урок уже позначено проведеним, тож він врахований)
+  const student = await prisma.student.findUnique({
+    where: { id: lesson.studentId },
+    include: { lessons: true, payments: true },
+  });
+  if (!student) return "already";
+
+  const balance = calculateStudentBalance(student.lessons, student.payments, student.paymentFrequency);
+  if (balance <= 0) {
+    // Борга немає: урок уже покритий раніше внесеними оплатами
+    return "already";
+  }
+
+  // Якщо частину вже покрито (залишок передоплати), записуємо лише різницю
+  const amount = Math.min(lesson.price, balance);
 
   await prisma.payment.create({
     data: {
       studentId: lesson.studentId,
       lessonId: lesson.id,
-      amount: lesson.price,
+      amount,
       status: "PAID",
       paidAt: new Date(),
       comment: "Через Telegram",
     },
   });
+  return "created";
 }
 
 export async function POST(request: NextRequest) {
@@ -270,9 +293,12 @@ async function handleCallbackQuery(callbackQuery: {
       data: updateData,
     });
 
-    // «Оплачено» тепер створює окрему оплату з датою (без подвоєння)
+    // «Оплачено» створює окрему оплату з датою, лише якщо урок ще не покритий
     if (code === "1") {
-      await recordLessonPayment(lesson);
+      const result = await recordLessonPayment(lesson);
+      if (result === "already") {
+        resultLabel = "✅ Проведено, оплачено (оплату вже було внесено раніше, нову не створено)";
+      }
     }
 
     await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
@@ -354,16 +380,20 @@ async function handleCallbackQuery(callbackQuery: {
     }
 
     if (code === "1") {
-      // Окрема оплата з датою замість позначки на уроці
-      await recordLessonPayment(lesson);
+      // Окрема оплата з датою, лише якщо урок ще не покритий
+      const result = await recordLessonPayment(lesson);
 
       await answerTelegramCallbackQuery(callbackQuery.id, "Збережено");
 
       if (messageId && chatId) {
+        const label =
+          result === "already"
+            ? "✅ Оплачено (оплату вже було внесено раніше, нову не створено)"
+            : "✅ Оплачено";
         await editTelegramMessageText(
           chatId,
           messageId,
-          `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n✅ Оплачено`
+          `💰 Урок з ${lesson.student.firstName} ${lesson.student.lastName ?? ""}\n\n${label}`
         );
       }
     } else {
