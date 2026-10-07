@@ -373,6 +373,24 @@ export default function CalendarView({ students }: { students: Student[] }) {
     NO_SHOW: "bg-red-100 text-red-800",
   };
 
+  // Кольори крапок для місячного вигляду на телефоні
+  const dotColors: Record<string, string> = {
+    SCHEDULED: "bg-pink-400",
+    COMPLETED: "bg-green-500",
+    CANCELLED_BY_STUDENT: "bg-gray-300",
+    CANCELLED_BY_TEACHER: "bg-gray-300",
+    RESCHEDULED: "bg-yellow-400",
+    NO_SHOW: "bg-red-500",
+  };
+
+  // На телефоні дотик на день у місячному вигляді відкриває цей день
+  function openDayFromMonth(day: Date) {
+    if (viewMode !== "month") return;
+    if (typeof window !== "undefined" && window.innerWidth >= 640) return;
+    setCurrentDate(day);
+    setViewMode("day");
+  }
+
   const selectedStudent = selectedLesson
     ? students.find((s) => s.id === selectedLesson.studentId)
     : null;
@@ -417,7 +435,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
       <p className="text-gray-500 font-medium">{formatMonthYear(currentDate)}</p>
 
       {viewMode === "month" && (
-        <div className="grid grid-cols-7 gap-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">
+        <div className="grid grid-cols-7 gap-1 sm:gap-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">
           {WEEKDAY_HEADERS.map((label) => (
             <div key={label}>{label}</div>
           ))}
@@ -428,30 +446,53 @@ export default function CalendarView({ students }: { students: Student[] }) {
         <p className="text-gray-400">Завантаження...</p>
       ) : (
         <div
-          className={`grid gap-3 ${
-            viewMode === "day" ? "grid-cols-1" : viewMode === "week" ? "grid-cols-1 sm:grid-cols-7" : "grid-cols-7"
+          className={`grid ${
+            viewMode === "day"
+              ? "grid-cols-1 gap-3"
+              : viewMode === "week"
+              ? "grid-cols-1 sm:grid-cols-7 gap-3"
+              : "grid-cols-7 gap-1 sm:gap-3"
           }`}
         >
           {days.map((day) => {
             const dayLessons = lessonsForDay(day);
             const isToday = day.toDateString() === new Date().toDateString();
             const isCurrentMonth = viewMode !== "month" || day.getMonth() === currentDate.getMonth();
+            const isMonth = viewMode === "month";
             return (
               <div
                 key={day.toISOString()}
-                className={`rounded-2xl shadow-sm p-3 min-h-[100px] ${
-                  isCurrentMonth ? "bg-white" : "bg-gray-50"
-                } ${isToday ? "ring-2 ring-pink-400" : ""}`}
+                onClick={() => openDayFromMonth(day)}
+                className={`rounded-2xl shadow-sm ${
+                  isMonth ? "p-1 sm:p-3 min-h-[64px] sm:min-h-[100px] cursor-pointer sm:cursor-default" : "p-3 min-h-[100px]"
+                } ${isCurrentMonth ? "bg-white" : "bg-gray-50"} ${isToday ? "ring-2 ring-pink-400" : ""}`}
               >
                 <p
                   className={`text-sm font-medium mb-2 ${
-                    isCurrentMonth ? "text-gray-500" : "text-gray-300"
-                  }`}
+                    isMonth ? "text-center sm:text-left" : ""
+                  } ${isCurrentMonth ? "text-gray-500" : "text-gray-300"}`}
                 >
-                  {formatDayLabel(day)}
+                  {isMonth ? (
+                    <>
+                      <span className="sm:hidden">{day.getDate()}</span>
+                      <span className="hidden sm:inline">{formatDayLabel(day)}</span>
+                    </>
+                  ) : (
+                    formatDayLabel(day)
+                  )}
                 </p>
+                {isCurrentMonth && isMonth && dayLessons.length > 0 && (
+                  <div className="sm:hidden flex flex-wrap justify-center gap-1">
+                    {dayLessons.map((lesson) => (
+                      <span
+                        key={lesson.id}
+                        className={`w-2 h-2 rounded-full ${dotColors[lesson.status] ?? "bg-gray-300"}`}
+                      />
+                    ))}
+                  </div>
+                )}
                 {isCurrentMonth && (
-                  <div className="space-y-1">
+                  <div className={isMonth ? "hidden sm:block space-y-1" : "space-y-1"}>
                     {dayLessons.map((lesson) => (
                       <button
                         key={lesson.id}
@@ -517,7 +558,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
 
       {selectedLesson && !showMaterials && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-lg font-semibold text-gray-800">
