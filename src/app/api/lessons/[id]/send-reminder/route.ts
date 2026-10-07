@@ -24,9 +24,18 @@ export async function POST(
     );
   }
 
+  // Дата й час завжди за Києвом (сервер Vercel працює за UTC)
   const date = new Date(lesson.startAt);
-  const lessonDate = date.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
-  const lessonTime = date.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
+  const lessonDate = date.toLocaleDateString("uk-UA", {
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Kyiv",
+  });
+  const lessonTime = date.toLocaleTimeString("uk-UA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Kyiv",
+  });
 
   const text = buildReminderMessage({
     studentFirstName: lesson.student.firstName,

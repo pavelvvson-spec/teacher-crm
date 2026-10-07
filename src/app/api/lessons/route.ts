@@ -38,9 +38,11 @@ export async function POST(request: NextRequest) {
 
   const conflict = await findConflictingLesson(startAt, endAt, undefined, body.studentId);
   if (conflict) {
+    // Час конфлікту показуємо за Києвом (сервер Vercel працює за UTC)
+    const conflictTime = conflict.startAt.toLocaleString("uk-UA", { timeZone: "Europe/Kyiv" });
     return NextResponse.json(
       {
-        error: `На цей час уже є урок з учнем №${conflict.student.studentNumber} ${conflict.student.firstName} (${conflict.startAt.toLocaleString("uk-UA")})`,
+        error: `На цей час уже є урок з учнем №${conflict.student.studentNumber} ${conflict.student.firstName} (${conflictTime})`,
       },
       { status: 409 }
     );
