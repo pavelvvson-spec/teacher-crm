@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
@@ -14,36 +15,163 @@ const NAV_ITEMS = [
   { href: "/settings/telegram", label: "Telegram" },
 ];
 
+// Нижня панель на телефоні: 4 головні сторінки + «Ще»
+const BOTTOM_MAIN = [
+  { href: "/", label: "Головна" },
+  { href: "/calendar", label: "Календар" },
+  { href: "/students", label: "Учні" },
+  { href: "/payments", label: "Оплати" },
+];
+
+const BOTTOM_MORE = [
+  { href: "/lessons", label: "Підготовка до уроку" },
+  { href: "/reports", label: "Звіти" },
+  { href: "/settings/telegram", label: "Telegram" },
+];
+
+function NavIcon({ href }: { href: string }) {
+  const common = {
+    className: "w-6 h-6",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (href === "/") {
+    return (
+      <svg {...common}>
+        <path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+      </svg>
+    );
+  }
+  if (href === "/calendar") {
+    return (
+      <svg {...common}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+    );
+  }
+  if (href === "/students") {
+    return (
+      <svg {...common}>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+        <circle cx="10" cy="7" r="4" />
+        <path d="M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
+      </svg>
+    );
+  }
+  if (href === "/payments") {
+    return (
+      <svg {...common}>
+        <rect x="2" y="6" width="20" height="12" rx="2" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    );
+  }
+  // «Ще»
+  return (
+    <svg {...common}>
+      <circle cx="5" cy="12" r="1.3" />
+      <circle cx="12" cy="12" r="1.3" />
+      <circle cx="19" cy="12" r="1.3" />
+    </svg>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
+  function isActive(href: string) {
+    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  }
+
+  const moreActive = BOTTOM_MORE.some((item) => isActive(item.href));
 
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b border-gray-200">
+      {/* Верхнє меню: тільки на комп'ютері */}
+      <header className="hidden sm:block bg-white border-b border-gray-200">
         <nav className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-between">
           <div className="flex flex-wrap gap-1">
-            {NAV_ITEMS.map((item) => {
-              const isActive =
-                item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`px-3 py-2 rounded-lg font-medium ${
-                    isActive
-                      ? "bg-pink-600 text-white"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-3 py-2 rounded-lg font-medium ${
+                  isActive(item.href)
+                    ? "bg-pink-600 text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
           </div>
           <LogoutButton />
         </nav>
       </header>
-      <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+
+      <main className="max-w-6xl mx-auto px-4 py-6 pb-28 sm:pb-6">{children}</main>
+
+      {/* Нижня панель: тільки на телефоні */}
+      {moreOpen && (
+        <div className="sm:hidden fixed inset-0 z-40 bg-black/30" onClick={() => setMoreOpen(false)}>
+          <div
+            className="absolute left-3 right-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] bg-white rounded-2xl shadow-lg p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {BOTTOM_MORE.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`block px-4 py-3 rounded-xl font-medium ${
+                  isActive(item.href) ? "bg-pink-50 text-pink-700" : "text-gray-700"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+            <div className="px-4 py-3 border-t border-gray-100 mt-1">
+              <LogoutButton />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
+        <div className="grid grid-cols-5">
+          {BOTTOM_MAIN.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center gap-0.5 h-16 text-[11px] font-medium ${
+                isActive(item.href) ? "text-pink-600" : "text-gray-500"
+              }`}
+            >
+              <NavIcon href={item.href} />
+              {item.label}
+            </Link>
+          ))}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            className={`flex flex-col items-center justify-center gap-0.5 h-16 text-[11px] font-medium ${
+              moreActive || moreOpen ? "text-pink-600" : "text-gray-500"
+            }`}
+          >
+            <NavIcon href="more" />
+            Ще
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

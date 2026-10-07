@@ -231,18 +231,21 @@ export default async function PaymentsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-sm text-gray-500 mb-1">Загальний борг</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
+          <p className="text-[11px] sm:text-sm text-gray-500 mb-1 leading-tight">
+            <span className="sm:hidden">Борг</span>
+            <span className="hidden sm:inline">Загальний борг</span>
+          </p>
           <details>
-            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-red-600">{totalDebt} грн</span>
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex flex-wrap items-baseline gap-x-2">
+              <span className="text-base sm:text-2xl font-bold text-red-600">{totalDebt} грн</span>
               {debtorsList.length > 0 && (
-                <span className="text-sm italic text-pink-600 underline decoration-dotted">Хто?</span>
+                <span className="text-xs sm:text-sm italic text-pink-600 underline decoration-dotted">Хто?</span>
               )}
             </summary>
             {debtorsList.length > 0 && (
-              <ul className="mt-2 space-y-1 text-sm text-gray-800">
+              <ul className="mt-2 space-y-1 text-xs sm:text-sm text-gray-800">
                 {debtorsList.map((s) => (
                   <li key={s.id}>{`${s.firstName} ${s.lastName ?? ""}`.trim()}</li>
                 ))}
@@ -250,18 +253,27 @@ export default async function PaymentsPage() {
             )}
           </details>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-sm text-gray-500 mb-1">Оплачено за поточний місяць</p>
-          <p className="text-2xl font-bold text-green-600">{monthIncome} грн</p>
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
+          <p className="text-[11px] sm:text-sm text-gray-500 mb-1 leading-tight">
+            <span className="sm:hidden">Оплачено</span>
+            <span className="hidden sm:inline">Оплачено за поточний місяць</span>
+          </p>
+          <p className="text-base sm:text-2xl font-bold text-green-600">{monthIncome} грн</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-sm text-gray-500 mb-1">Ще може зайти за місяць</p>
-          <p className="text-2xl font-bold text-pink-600">{potentialLeft} грн</p>
-          <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
+          <p className="text-[11px] sm:text-sm text-gray-500 mb-1 leading-tight">
+            <span className="sm:hidden">Ще зайде</span>
+            <span className="hidden sm:inline">Ще може зайти за місяць</span>
+          </p>
+          <p className="text-base sm:text-2xl font-bold text-pink-600">{potentialLeft} грн</p>
+          <div className="mt-2 h-1.5 sm:h-2 rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full bg-green-500" style={{ width: `${receivedPercent}%` }} />
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            надійшло {monthIncome} з {monthForecast} грн прогнозу ({receivedPercent}%)
+          <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-tight">
+            <span className="sm:hidden">{receivedPercent}% з {monthForecast}</span>
+            <span className="hidden sm:inline">
+              надійшло {monthIncome} з {monthForecast} грн прогнозу ({receivedPercent}%)
+            </span>
           </p>
         </div>
       </div>
