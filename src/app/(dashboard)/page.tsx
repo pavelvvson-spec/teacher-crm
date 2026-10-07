@@ -52,24 +52,42 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-pink-600 text-white rounded-2xl shadow-sm p-6 text-center">
-        <p className="text-xl font-semibold">Сашуню, у тебе все вийде! 💪💖</p>
+      <div className="bg-pink-600 text-white rounded-2xl shadow-sm p-4 sm:p-6 text-center">
+        <p className="text-lg sm:text-xl font-semibold">Сашуню, у тебе все вийде! 💪💖</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-sm text-gray-500">Уроків сьогодні</p>
-          <p className="text-2xl font-semibold text-gray-800">{todayLessons.length}</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
+          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight">
+            <span className="sm:hidden">Сьогодні</span>
+            <span className="hidden sm:inline">Уроків сьогодні</span>
+          </p>
+          <p className="text-base sm:text-2xl font-semibold text-gray-800 mt-1 sm:mt-0">
+            {todayLessons.length}
+            <span className="sm:hidden text-xs font-medium text-gray-500"> ур.</span>
+          </p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-sm text-gray-500">Заробиш сьогодні</p>
-          <p className="text-2xl font-semibold text-green-600">{todayIncome} грн</p>
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
+          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight">
+            <span className="sm:hidden">Заробиш</span>
+            <span className="hidden sm:inline">Заробиш сьогодні</span>
+          </p>
+          <p className="text-base sm:text-2xl font-semibold text-green-600 mt-1 sm:mt-0">{todayIncome} грн</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-sm text-gray-500">Прогноз на місяць</p>
-          <p className="text-2xl font-semibold text-pink-600">{monthForecast} грн</p>
-          <p className="text-xs text-gray-400 mt-1">{monthLessons.length} уроків за календарем</p>
-          <p className="text-xs text-gray-500 mt-0.5">≈ {formatHours(monthMinutes)} роботи</p>
+        <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
+          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight">
+            <span className="sm:hidden">Прогноз</span>
+            <span className="hidden sm:inline">Прогноз на місяць</span>
+          </p>
+          <p className="text-base sm:text-2xl font-semibold text-pink-600 mt-1 sm:mt-0">{monthForecast} грн</p>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">
+            <span className="sm:hidden">{monthLessons.length} ур.</span>
+            <span className="hidden sm:inline">{monthLessons.length} уроків за календарем</span>
+          </p>
+          <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 leading-tight">
+            ≈ {formatHours(monthMinutes)}
+            <span className="hidden sm:inline"> роботи</span>
+          </p>
         </div>
       </div>
 
