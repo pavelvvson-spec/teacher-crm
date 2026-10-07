@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import CheerBanner from "@/components/CheerBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -99,9 +100,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-pink-600 text-white rounded-2xl shadow-sm p-4 sm:p-6 text-center">
-        <p className="text-lg sm:text-xl font-semibold">Сашуню, у тебе все вийде! 💪💖</p>
-      </div>
+      <CheerBanner />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
