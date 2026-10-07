@@ -99,7 +99,7 @@ export default async function TelegramSettingsPage() {
                   </p>
                   <p className="text-sm text-gray-500">
                     {reminder.reminderType === "H24" ? "За 24 год" : "За 2 год"} ·{" "}
-                    {new Date(reminder.createdAt).toLocaleString("uk-UA")}
+                    {new Date(reminder.createdAt).toLocaleString("uk-UA", { timeZone: "Europe/Kyiv" })}
                   </p>
                 </div>
                 {reminder.status === "SENT" ? (
