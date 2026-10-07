@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 
 const NAV_ITEMS = [
@@ -28,6 +28,9 @@ const BOTTOM_MORE = [
   { href: "/reports", label: "Звіти" },
   { href: "/settings/telegram", label: "Telegram" },
 ];
+
+// Сторінки першого рівня: на них кнопка «Назад» не потрібна
+const TOP_LEVEL_PATHS = NAV_ITEMS.map((item) => item.href);
 
 function NavIcon({ href }: { href: string }) {
   const common = {
@@ -83,6 +86,7 @@ function NavIcon({ href }: { href: string }) {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
@@ -94,6 +98,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const moreActive = BOTTOM_MORE.some((item) => isActive(item.href));
+
+  const showBack = !TOP_LEVEL_PATHS.includes(pathname);
+
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    // Якщо історії немає (відкрили сторінку напряму), йдемо на рівень вище
+    const parts = pathname.split("/").filter(Boolean);
+    parts.pop();
+    router.push(parts.length > 0 ? "/" + parts.join("/") : "/");
+  }
 
   return (
     <div className="min-h-screen">
@@ -119,7 +136,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 pb-28 sm:pb-6">{children}</main>
+      <main className="max-w-6xl mx-auto px-4 py-6 pb-28 sm:pb-6">
+        {showBack && (
+          <button
+            type="button"
+            onClick={goBack}
+            className="sm:hidden mb-4 inline-flex items-center gap-1 px-3 py-2 -ml-1 rounded-xl bg-white text-pink-600 font-medium shadow-sm"
+          >
+            <svg
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            Назад
+          </button>
+        )}
+        {children}
+      </main>
 
       {/* Нижня панель: тільки на телефоні */}
       {moreOpen && (
