@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { formatTime } from "@/lib/calendar-utils";
 
 export const dynamic = "force-dynamic";
+
+const KYIV_TZ = "Europe/Kyiv";
 
 function formatHours(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60);
@@ -11,12 +12,58 @@ function formatHours(totalMinutes: number): string {
   return `${hours} год ${minutes} хв`;
 }
 
+// Частини дати (рік, місяць, день, години...) за київським часом
+function kyivParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: KYIV_TZ,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return {
+    year: get("year"),
+    month: get("month") - 1,
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+    second: get("second"),
+  };
+}
+
+// Різниця між київським часом і UTC у мілісекундах
+function kyivOffsetMs(date: Date): number {
+  const p = kyivParts(date);
+  const asUtc = Date.UTC(p.year, p.month, p.day, p.hour, p.minute, p.second);
+  return asUtc - Math.floor(date.getTime() / 1000) * 1000;
+}
+
+// Створює момент часу за київським годинником
+function kyivDate(year: number, month: number, day: number, h = 0, m = 0, s = 0): Date {
+  const guess = new Date(Date.UTC(year, month, day, h, m, s));
+  return new Date(guess.getTime() - kyivOffsetMs(guess));
+}
+
+function formatKyivTime(date: Date): string {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: KYIV_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export default async function HomePage() {
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const { year, month, day } = kyivParts(now);
+
+  const startOfToday = kyivDate(year, month, day);
+  const endOfToday = kyivDate(year, month, day, 23, 59, 59);
+  const startOfMonth = kyivDate(year, month, 1);
+  const endOfMonth = kyivDate(year, month + 1, 0, 23, 59, 59);
 
   const todayLessons = await prisma.lesson.findMany({
     where: {
@@ -104,7 +151,7 @@ export default async function HomePage() {
                     {lesson.student.firstName} {lesson.student.lastName ?? ""}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {formatTime(new Date(lesson.startAt))} · {lesson.duration} хв
+                    {formatKyivTime(new Date(lesson.startAt))} · {lesson.duration} хв
                   </p>
                 </div>
                 <p className="font-semibold text-pink-600">{lesson.price} грн</p>
