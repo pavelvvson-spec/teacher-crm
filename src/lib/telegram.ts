@@ -232,3 +232,35 @@ export async function sendLongTelegramMessage(
     }
   }
 }
+
+// Надсилає вже готовий HTML (з <b>, <i>, <s>) частинами по абзацах, щоб не розірвати теги.
+// Увесь змінний текст усередині має бути екранований через escapeTelegramHtml.
+export async function sendTelegramHtmlMessage(
+  chatId: string,
+  html: string,
+  buttonRows?: TelegramInlineButton[][]
+): Promise<void> {
+  const LIMIT = 3800;
+  const blocks = html.split("\n\n");
+  const parts: string[] = [];
+  let cur = "";
+  for (const b of blocks) {
+    const next = cur ? `${cur}\n\n${b}` : b;
+    if (next.length > LIMIT && cur) {
+      parts.push(cur);
+      cur = b;
+    } else {
+      cur = next;
+    }
+  }
+  if (cur) parts.push(cur);
+
+  for (let i = 0; i < parts.length; i++) {
+    const isLast = i === parts.length - 1;
+    if (isLast && buttonRows && buttonRows.length > 0) {
+      await sendTelegramMessageWithButtons(chatId, parts[i], buttonRows);
+    } else {
+      await sendTelegramMessage(chatId, parts[i]);
+    }
+  }
+}

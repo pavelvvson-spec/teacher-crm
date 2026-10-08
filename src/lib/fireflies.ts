@@ -9,7 +9,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { callClaude } from "@/lib/anthropic";
-import { sendLongTelegramMessage } from "@/lib/telegram";
+import { sendLongTelegramMessage, sendTelegramHtmlMessage, escapeTelegramHtml } from "@/lib/telegram";
 
 const API = "https://api.fireflies.ai/graphql";
 const TEACHER_NAME_HINTS = ["олександра", "oleksandra", "aleksandra", "саша", "sasha", "tokarchuk", "васютинськ"];
@@ -187,14 +187,18 @@ const SUMMARY_PROMPT = `Ти — асистент вчительки англі�
 
 Відповідай СТРОГО одним JSON без тексту навколо:
 {
-  "summary": "запис у журнал (звичайний текст, до ~12 рядків):\nТеми і що робили: ...\nЩо вийшло добре: ...\nТруднощі: ...\nДЗ і що повторити: ...\nНа що звернути увагу наступного разу: ...",
+  "topics": ["що робили на уроці — 2-4 коротких пункти"],
+  "went_well": ["що вийшло добре — 1-3 пункти"],
+  "difficulties": ["труднощі учня — 1-3 пункти, або порожній масив"],
+  "homework": ["ДЗ і що повторити — 1-3 пункти, або порожній масив"],
+  "next_focus": ["на що звернути увагу наступного разу — 1-2 пункти"],
   "student_pct": 30,
   "errors": [{"wrong": "фраза учня з помилкою", "right": "правильний варіант"}],
   "errors_note": "",
   "advice": "1-2 короткі конкретні поради ВЧИТЕЛЬЦІ (на «ти», тепло, як колега) щодо того, як вести уроки з цим учнем — темп, хто більше говорить, типи запитань, що спрацювало"
 }
 errors — лише реальні помилки в англійських фразах учня (максимум 5, найтиповіші). Не записуй сюди неточності розпізнавання. Якщо учень майже не говорив англійською або розпізнавання надто погане (часто з малими дітьми) — errors: [] і в errors_note одне речення чому.
-Використовуй \\n для нових рядків усередині значень.`;
+Кожен пункт — одне коротке речення (до ~15 слів), без нумерації і без маркерів на початку. Пиши просто й по-людськи.`;
 
 export type ProcessResult =
   | { status: "saved"; studentName: string; entryId: string }
@@ -241,7 +245,11 @@ ${transcriptToText(t)}`;
   }
 
   type Analysis = {
-    summary?: string;
+    topics?: string[];
+    went_well?: string[];
+    difficulties?: string[];
+    homework?: string[];
+    next_focus?: string[];
     student_pct?: number;
     errors?: { wrong?: string; right?: string }[];
     errors_note?: string;
@@ -257,7 +265,22 @@ ${transcriptToText(t)}`;
       parsed = null;
     }
   }
-  const summary = (parsed?.summary ?? ai.text).trim();
+  const list = (v: unknown): string[] =>
+    (Array.isArray(v) ? v : typeof v === "string" ? [v] : [])
+      .map((x) => String(x).replace(/^\s*(?:[•\-–*]|\d+[.)])\s*/, "").trim())
+      .filter(Boolean)
+      .slice(0, 5);
+  const sections: { emoji: string; title: string; items: string[] }[] = [
+    { emoji: "📚", title: "Що робили", items: list(parsed?.topics) },
+    { emoji: "✅", title: "Що вийшло", items: list(parsed?.went_well) },
+    { emoji: "⚠️", title: "Труднощі", items: list(parsed?.difficulties) },
+    { emoji: "📝", title: "ДЗ і повторення", items: list(parsed?.homework) },
+    { emoji: "🎯", title: "Наступного разу", items: list(parsed?.next_focus) },
+  ].filter((x) => x.items.length > 0);
+  // Звичайний текст — для журналу (і запасний варіант, якщо ШІ повернув не JSON)
+  const summary = sections.length
+    ? sections.map((x) => `${x.title}: ${x.items.join("; ")}`).join("\n")
+    : ai.text.trim();
   const studentPctRaw = Number(parsed?.student_pct);
   const studentPct =
     Number.isFinite(studentPctRaw) && studentPctRaw >= 0 && studentPctRaw <= 100
@@ -266,7 +289,7 @@ ${transcriptToText(t)}`;
   const errors = (parsed?.errors ?? [])
     .filter((e) => e.wrong && e.right)
     .slice(0, 5)
-    .map((e) => `${String(e.wrong).trim()} → ${String(e.right).trim()}`);
+    .map((e) => ({ wrong: String(e.wrong).trim(), right: String(e.right).trim() }));
   const errorsNote = (parsed?.errors_note ?? "").trim();
   const advice = (parsed?.advice ?? "").trim();
 
@@ -277,21 +300,9 @@ ${transcriptToText(t)}`;
     select: { studentTalkPct: true },
   });
 
-  const reviewLines: string[] = [];
-  if (studentPct != null) {
-    reviewLines.push(
-      `Говорила ти ~${100 - studentPct}%, учень ~${studentPct}%` +
-        (prev?.studentTalkPct != null ? ` (минулого разу учень ~${prev.studentTalkPct}%)` : "")
-    );
-  }
-  if (errors.length) reviewLines.push(`Помилки учня:\n${errors.map((e) => `• ${e}`).join("\n")}`);
-  else if (errorsNote) reviewLines.push(`Помилки: ${errorsNote}`);
-  if (advice) reviewLines.push(`Порада: ${advice}`);
-  const review = reviewLines.join("\n");
-
   // У журнал зберігаємо і конспект, і розбір — щоб портрет бачив повторювані помилки
   const journalReview = [
-    errors.length ? `Помилки учня: ${errors.join("; ")}` : "",
+    errors.length ? `Помилки учня: ${errors.map((e) => `${e.wrong} → ${e.right}`).join("; ")}` : "",
     studentPct != null ? `Учень говорив ~${studentPct}% часу уроку` : "",
     advice ? `Порада вчительці: ${advice}` : "",
   ]
@@ -318,10 +329,42 @@ ${transcriptToText(t)}`;
   }
 
   if (notify) {
-    await sendTeacherWithUndo(
-      `🎧 Урок з ${name} (${dateLabel}) — записала в журнал:\n\n${summary}${review ? `\n\n📊 Для тебе\n${review}` : ""}`,
-      entryId
-    );
+    const h = escapeTelegramHtml;
+    const blocks: string[] = [`🎧 <b>Урок з ${h(name)}</b> · ${h(dateLabel)}\n<i>Конспект збережено в журнал учня</i>`];
+    if (sections.length) {
+      for (const sec of sections) {
+        blocks.push(`${sec.emoji} <b>${sec.title}</b>\n${sec.items.map((i) => `• ${h(i)}`).join("\n")}`);
+      }
+    } else {
+      blocks.push(h(summary));
+    }
+
+    const review: string[] = [];
+    if (studentPct != null) {
+      review.push(
+        `🗣 <b>Хто говорив</b>\nТи ~${100 - studentPct}% · учень ~${studentPct}%` +
+          (prev?.studentTalkPct != null ? `\n<i>минулого разу учень ~${prev.studentTalkPct}%</i>` : "")
+      );
+    }
+    if (errors.length) {
+      review.push(
+        `❌ <b>Помилки учня</b>\n${errors.map((e) => `• <s>${h(e.wrong)}</s> → <b>${h(e.right)}</b>`).join("\n")}`
+      );
+    } else if (errorsNote) {
+      review.push(`❌ <b>Помилки учня</b>\n<i>${h(errorsNote)}</i>`);
+    }
+    if (advice) review.push(`💡 <b>Порада</b>\n${h(advice)}`);
+    if (review.length) {
+      blocks.push(`━━━━━━━━━━━━\n📊 <b>ДЛЯ ТЕБЕ</b>`);
+      blocks.push(...review);
+    }
+
+    const chatId = await teacherChatId();
+    if (chatId) {
+      await sendTelegramHtmlMessage(chatId, blocks.join("\n\n"), [
+        [{ text: "↩️ Прибрати з журналу", callback_data: `jdel:${entryId}` }],
+      ]);
+    }
   }
   return { status: "saved", studentName: name, entryId };
 }
@@ -355,13 +398,4 @@ async function teacherChatId() {
 async function notifyTeacher(text: string) {
   const chatId = await teacherChatId();
   if (chatId) await sendLongTelegramMessage(chatId, text);
-}
-
-async function sendTeacherWithUndo(text: string, entryId: string) {
-  const chatId = await teacherChatId();
-  if (chatId) {
-    await sendLongTelegramMessage(chatId, text, [
-      [{ text: "↩️ Прибрати з журналу", callback_data: `jdel:${entryId}` }],
-    ]);
-  }
 }
