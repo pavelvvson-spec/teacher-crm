@@ -68,23 +68,32 @@ export function ageInfo(s: {
   birthDay?: number | null;
   birthMonth?: number | null;
   isAdult?: boolean | null;
+  gender?: string | null;
 }): string {
+  const f = s.gender === "F";
+  // Підказка ШІ про стать — щоб писав про учня/ученицю в правильному роді
+  const genderNote =
+    s.gender === "F"
+      ? "; стать: дівчина — пиши про неї в жіночому роді"
+      : s.gender === "M"
+        ? "; стать: хлопець — пиши про нього в чоловічому роді"
+        : "";
   if (s.birthYear) {
     const age = ageYears(s) ?? 0;
     const group =
       age <= 6
         ? "дошкільня"
         : age <= 10
-          ? "молодший школяр"
+          ? f ? "молодша школярка" : "молодший школяр"
           : age <= 15
-            ? "підліток"
+            ? f ? "дівчина-підліток" : "підліток"
             : age <= 17
-              ? "старшокласник"
-              : "дорослий";
-    return `${age} р. (${group})`;
+              ? f ? "старшокласниця" : "старшокласник"
+              : f ? "доросла" : "дорослий";
+    return `${age} р. (${group})${genderNote}`;
   }
-  if (s.isAdult) return "дорослий";
-  return "невідомо";
+  if (s.isAdult) return `${f ? "доросла" : "дорослий"}${genderNote}`;
+  return `невідомо${genderNote}`;
 }
 
 // Додаток до системної інструкції: загальні принципи + методика вчительки

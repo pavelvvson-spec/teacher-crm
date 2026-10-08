@@ -16,6 +16,7 @@ type StudentFormValues = {
   birthDay: string;
   birthMonth: string;
   isAdult: boolean;
+  gender: string; // "M" | "F" | ""
   englishLevel: string;
   lessonFormat: string;
   defaultLessonDuration: number;
@@ -72,6 +73,7 @@ export default function StudentForm({
     birthDay: initialValues?.birthDay ?? "",
     birthMonth: initialValues?.birthMonth ?? "",
     isAdult: initialValues?.isAdult ?? false,
+    gender: initialValues?.gender ?? "",
     englishLevel: initialValues?.englishLevel ?? "A1",
     lessonFormat: initialValues?.lessonFormat ?? "ONLINE",
     defaultLessonDuration: initialValues?.defaultLessonDuration ?? 60,
@@ -133,7 +135,29 @@ export default function StudentForm({
       <section className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>Ім&apos;я *</label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className="text-sm text-gray-600">Ім&apos;я *</label>
+              {/* Стать — для правильних відмінків у CRM, Telegram і порадах ШІ */}
+              <div className="flex items-center gap-1.5" role="radiogroup" aria-label="Стать">
+                {[
+                  { v: "M", title: "Хлопець", cls: "bg-sky-500", ring: "ring-sky-300" },
+                  { v: "F", title: "Дівчина", cls: "bg-pink-500", ring: "ring-pink-300" },
+                ].map((g) => (
+                  <button
+                    key={g.v}
+                    type="button"
+                    role="radio"
+                    aria-checked={values.gender === g.v}
+                    title={g.title}
+                    aria-label={g.title}
+                    onClick={() => setValues({ ...values, gender: values.gender === g.v ? "" : g.v })}
+                    className={`w-6 h-6 rounded-full ${g.cls} ${
+                      values.gender === g.v ? `ring-2 ring-offset-2 ${g.ring}` : "opacity-25 hover:opacity-60"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
             <input
               required
               value={values.firstName}
@@ -180,10 +204,12 @@ export default function StudentForm({
                 <p className="mt-1 text-xs text-green-700">✓ Підключено до бота</p>
               ) : values.telegramUsername.trim() ? (
                 <p className="mt-1 text-xs text-red-600">
-                  Ще не підключено до бота — попросіть учня знайти бота в Telegram і натиснути «Start»
+                  Ще не підключено до бота — попросіть {values.gender === "F" ? "ученицю" : "учня"} знайти бота в Telegram і натиснути «Start»
                 </p>
               ) : (
-                <p className="mt-1 text-xs text-gray-400">Вкажіть username, щоб учень міг підключитися до бота</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  Вкажіть username, щоб {values.gender === "F" ? "учениця могла" : "учень міг"} підключитися до бота
+                </p>
               ))}
           </div>
           <div>

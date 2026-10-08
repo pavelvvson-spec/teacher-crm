@@ -18,6 +18,7 @@ import CalendarResetMenu from "@/components/CalendarResetMenu";
 import SyncAllSchedulesButton from "@/components/SyncAllSchedulesButton";
 import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
 import LessonPrepModal from "@/components/LessonPrepModal";
+import { byGender, noShowPaidNote } from "@/lib/gender";
 import SendLinkButton from "@/components/SendLinkButton";
 
 type Student = {
@@ -42,7 +43,7 @@ type Lesson = {
   meetingLink: string | null;
   teacherNotes: string | null;
   homework: string | null;
-  student: { firstName: string; lastName: string | null };
+  student: { firstName: string; lastName: string | null; gender?: string | null };
 };
 
 type ViewMode = "day" | "week" | "month";
@@ -164,7 +165,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setAskNoShowFor(null);
     if (charged) {
       // Учень не прийшов, але урок оплачується: рахуємо як проведений, з приміткою
-      const noteLine = "Не з'явився, урок оплачується";
+      const noteLine = noShowPaidNote(lesson.student.gender);
       const teacherNotes = lesson.teacherNotes
         ? `${lesson.teacherNotes}\n${noteLine}`
         : noteLine;
@@ -548,7 +549,9 @@ export default function CalendarView({ students }: { students: Student[] }) {
                     statusColors[selectedLesson.status] ?? "bg-gray-100 text-gray-600"
                   }`}
                 >
-                  {LESSON_STATUS_LABELS[selectedLesson.status]}
+                  {selectedLesson.status === "NO_SHOW"
+                    ? byGender(selectedLesson.student.gender, "Учень не прийшов", "Учениця не прийшла")
+                    : LESSON_STATUS_LABELS[selectedLesson.status]}
                 </span>
               </div>
               <button
@@ -611,14 +614,15 @@ export default function CalendarView({ students }: { students: Student[] }) {
                       : "bg-white text-red-700 border-red-200 hover:bg-red-50"
                   }`}
                 >
-                  Не прийшов
+                  {byGender(selectedLesson.student.gender, "Не прийшов", "Не прийшла")}
                 </button>
               </div>
 
               {askNoShowFor === selectedLesson.id && (
                 <div className="bg-red-50 rounded-xl p-4 space-y-3">
                   <p className="text-sm font-medium text-gray-700">
-                    Учень не прийшов. Цей урок оплачується?
+                    {byGender(selectedLesson.student.gender, "Учень не прийшов", "Учениця не прийшла")}. Цей урок
+                    оплачується?
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button

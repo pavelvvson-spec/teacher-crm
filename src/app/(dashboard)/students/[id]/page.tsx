@@ -4,6 +4,7 @@ import StudentForm from "@/components/StudentForm";
 import StudentScheduleManager from "@/components/StudentScheduleManager";
 import StudentJournal from "@/components/StudentJournal";
 import StudentActionsMenu from "@/components/StudentActionsMenu";
+import { studentWord } from "@/lib/gender";
 import { getStudentNumber } from "@/lib/student-number";
 
 export default async function StudentDetailPage({
@@ -33,6 +34,7 @@ export default async function StudentDetailPage({
     viberPhone: student.viberPhone ?? "",
     birthYear: student.birthYear ? String(student.birthYear) : "",
     isAdult: student.isAdult,
+    gender: student.gender ?? "",
     birthDay: student.birthDay ? String(student.birthDay) : "",
     birthMonth: student.birthMonth ? String(student.birthMonth) : "",
     englishLevel: student.englishLevel,
@@ -49,7 +51,7 @@ export default async function StudentDetailPage({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-gray-400">
-            Учень №{studentNumber} · {student.englishLevel}
+            {studentWord(student.gender)} №{studentNumber} · {student.englishLevel}
             {!student.isActive && (
               <span className="ml-2 text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md">неактивний</span>
             )}

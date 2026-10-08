@@ -57,6 +57,8 @@ model Student {
   birthDay              Int?
   birthMonth            Int?
   isAdult               Boolean   @default(false)
+  // Стать для правильних відмінків: "M" — хлопець, "F" — дівчина, null — не вказано
+  gender                String?
   englishLevel          EnglishLevel
   lessonFormat          LessonFormat
   defaultLessonDuration Int       // у хвилинах

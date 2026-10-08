@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { noShowPaidNote } from "@/lib/gender";
 import { prisma } from "@/lib/prisma";
 import {
   sendTelegramMessage,
@@ -292,7 +293,7 @@ async function handleHomeworkRequest(chatId: string) {
       const dateLabel = formatLessonDateTimeKyiv(nextLesson.startAt);
       await sendTelegramMessage(
         settings.teacherTelegramChatId,
-        `⚠️ ${student.firstName} ${student.lastName ?? ""} просив(ла) домашнє завдання до уроку ${dateLabel}, але воно ще не внесене в CRM.`
+        `⚠️ ${student.firstName} ${student.lastName ?? ""} ${student.gender === "F" ? "просила" : student.gender === "M" ? "просив" : "просив(ла)"} домашнє завдання до уроку ${dateLabel}, але воно ще не внесене в CRM.`
       );
     }
     return;
@@ -438,7 +439,7 @@ async function handleCallbackQuery(callbackQuery: {
     let resultLabel: string;
 
     if (code === "1") {
-      const noteLine = "Не з'явився, урок оплачується";
+      const noteLine = noShowPaidNote(lesson.student.gender);
       const teacherNotes = lesson.teacherNotes ? `${lesson.teacherNotes}\n${noteLine}` : noteLine;
       await prisma.lesson.update({
         where: { id: lessonId },
