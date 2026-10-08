@@ -229,6 +229,8 @@ model StudentJournalEntry {
   lessonId  String?
   // id запису Fireflies — щоб той самий урок не потрапив у журнал двічі
   externalId String?      @unique
+  // Частка мовлення учня на уроці (з запису Fireflies), %
+  studentTalkPct Int?
   createdAt DateTime      @default(now())
 
   @@index([studentId, createdAt])
