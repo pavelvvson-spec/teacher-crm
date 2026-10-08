@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/api/fireflies/webhook",
   "/api/cron/daily-checkup",
   "/api/cron/daily-summary",
+  "/api/cron/tick",
 ];
 
 export async function proxy(request: NextRequest) {
