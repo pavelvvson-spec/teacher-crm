@@ -18,6 +18,7 @@ import CalendarResetMenu from "@/components/CalendarResetMenu";
 import SyncAllSchedulesButton from "@/components/SyncAllSchedulesButton";
 import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
 import LessonPrepModal from "@/components/LessonPrepModal";
+import LessonPlanView from "@/components/LessonPlanView";
 import { byGender, noShowPaidNote } from "@/lib/gender";
 import SendLinkButton from "@/components/SendLinkButton";
 
@@ -44,6 +45,7 @@ type Lesson = {
   teacherNotes: string | null;
   homework: string | null;
   student: { firstName: string; lastName: string | null; gender?: string | null };
+  _count?: { materials: number };
 };
 
 type ViewMode = "day" | "week" | "month";
@@ -63,6 +65,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [askNoShowFor, setAskNoShowFor] = useState<string | null>(null);
 
   const [showMaterials, setShowMaterials] = useState(false);
+  const [showPlan, setShowPlan] = useState(false);
 
   const getRange = useCallback(() => {
     if (viewMode === "day") {
@@ -113,6 +116,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
 
   // Закриття вікон: хрестик, клік поза вікном, Esc
   function closeLesson() {
+    setShowPlan(false);
     setSelectedLesson(null);
     setReschedulingLesson(null);
     setAskNoShowFor(null);
@@ -129,6 +133,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (showForm) setShowForm(false);
+      else if (showPlan) return; // вікно плану закривається само
       else if (showMaterials) return; // вікно підготовки закривається само (з перевіркою незбереженого)
       else closeLesson();
     }
@@ -225,7 +230,13 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadLessons();
   }
 
+  // Урок підготовлено, якщо є нотатка, ДЗ або хоча б один матеріал
+  function isPrepared(l: Lesson): boolean {
+    return Boolean(l.teacherNotes?.trim() || l.homework?.trim() || (l._count?.materials ?? 0) > 0);
+  }
+
   function openMaterials(lesson: Lesson) {
+    setShowPlan(false);
     setSelectedLesson(lesson);
     setShowMaterials(true);
   }
@@ -653,13 +664,23 @@ export default function CalendarView({ students }: { students: Student[] }) {
 
             {/* Головні дії */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => openMaterials(selectedLesson)}
-                className="w-full px-4 py-3 bg-pink-600 text-white rounded-xl text-sm font-medium hover:bg-pink-700"
-              >
-                Підготувати урок
-              </button>
+              {isPrepared(selectedLesson) ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPlan(true)}
+                  className="w-full px-4 py-3 bg-pink-600 text-white rounded-xl text-sm font-medium hover:bg-pink-700"
+                >
+                  📋 План уроку
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openMaterials(selectedLesson)}
+                  className="w-full px-4 py-3 bg-pink-600 text-white rounded-xl text-sm font-medium hover:bg-pink-700"
+                >
+                  Підготувати урок
+                </button>
+              )}
               <SendLinkButton key={selectedLesson.id} lessonId={selectedLesson.id} />
             </div>
 
@@ -748,6 +769,15 @@ export default function CalendarView({ students }: { students: Student[] }) {
         </div>
       )}
 
+      {selectedLesson && showPlan && !showMaterials && (
+        <LessonPlanView
+          key={`plan-${selectedLesson.id}`}
+          lesson={selectedLesson}
+          onClose={() => setShowPlan(false)}
+          onEdit={() => openMaterials(selectedLesson)}
+        />
+      )}
+
       {selectedLesson && showMaterials && (
         <LessonPrepModal
           key={selectedLesson.id}
@@ -756,6 +786,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
           onSaved={(fields) => {
             setSelectedLesson((prev) => (prev ? { ...prev, ...fields } : prev));
             setLessons((prev) => prev.map((l) => (l.id === selectedLesson.id ? { ...l, ...fields } : l)));
+          }}
+          onMaterialsChange={(materials) => {
+            const _count = { materials: materials.length };
+            setSelectedLesson((prev) => (prev ? { ...prev, _count } : prev));
+            setLessons((prev) => prev.map((l) => (l.id === selectedLesson.id ? { ...l, _count } : l)));
           }}
         />
       )}

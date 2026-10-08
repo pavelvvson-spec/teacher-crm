@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         ? { startAt: { gte: new Date(from), lte: new Date(to) } }
         : {}),
     },
-    include: { student: true },
+    include: { student: true, _count: { select: { materials: true } } },
     orderBy: { startAt: "asc" },
   });
 
