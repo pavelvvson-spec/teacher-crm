@@ -45,6 +45,8 @@ export async function PUT(
       viberPhone: body.viberPhone || null,
       birthYear: Number(body.birthYear) >= 1920 && Number(body.birthYear) <= new Date().getFullYear() ? Number(body.birthYear) : null,
       isAdult: Boolean(body.isAdult),
+      birthDay: Number(body.birthDay) >= 1 && Number(body.birthDay) <= 31 ? Number(body.birthDay) : null,
+      birthMonth: Number(body.birthMonth) >= 1 && Number(body.birthMonth) <= 12 ? Number(body.birthMonth) : null,
       englishLevel: body.englishLevel,
       lessonFormat: body.lessonFormat,
       defaultLessonDuration: Number(body.defaultLessonDuration) || 60,

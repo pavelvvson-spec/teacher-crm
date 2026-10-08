@@ -13,6 +13,8 @@ type StudentFormValues = {
   contactChannel: string;
   viberPhone: string;
   birthYear: string;
+  birthDay: string;
+  birthMonth: string;
   isAdult: boolean;
   englishLevel: string;
   lessonFormat: string;
@@ -24,6 +26,21 @@ type StudentFormValues = {
 };
 
 const ENGLISH_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+const MONTHS_UA = [
+  "січня",
+  "лютого",
+  "березня",
+  "квітня",
+  "травня",
+  "червня",
+  "липня",
+  "серпня",
+  "вересня",
+  "жовтня",
+  "листопада",
+  "грудня",
+];
 
 const PAYMENT_FREQUENCY_LABELS: Record<string, string> = {
   PER_LESSON: "Поурочна",
@@ -46,6 +63,8 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
     contactChannel: initialValues?.contactChannel ?? "TELEGRAM",
     viberPhone: initialValues?.viberPhone ?? "",
     birthYear: initialValues?.birthYear ?? "",
+    birthDay: initialValues?.birthDay ?? "",
+    birthMonth: initialValues?.birthMonth ?? "",
     isAdult: initialValues?.isAdult ?? false,
     englishLevel: initialValues?.englishLevel ?? "A1",
     lessonFormat: initialValues?.lessonFormat ?? "ONLINE",
@@ -219,15 +238,39 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Рік народження</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={values.birthYear}
-            onChange={(e) => setValues({ ...values, birthYear: e.target.value })}
-            placeholder="Наприклад, 2018"
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1">День народження</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={31}
+              value={values.birthDay}
+              onChange={(e) => setValues({ ...values, birthDay: e.target.value })}
+              placeholder="День"
+              className="w-20 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+            <select
+              value={values.birthMonth}
+              onChange={(e) => setValues({ ...values, birthMonth: e.target.value })}
+              className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+            >
+              <option value="">Місяць</option>
+              {MONTHS_UA.map((m, i) => (
+                <option key={m} value={String(i + 1)}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={values.birthYear}
+              onChange={(e) => setValues({ ...values, birthYear: e.target.value })}
+              placeholder="Рік"
+              className="w-24 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+            />
+          </div>
           <label className="flex items-center gap-2 mt-2">
             <input
               type="checkbox"

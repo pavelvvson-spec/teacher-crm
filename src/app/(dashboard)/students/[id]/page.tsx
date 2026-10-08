@@ -41,6 +41,8 @@ export default async function StudentDetailPage({
           viberPhone: student.viberPhone ?? "",
           birthYear: student.birthYear ? String(student.birthYear) : "",
           isAdult: student.isAdult,
+          birthDay: student.birthDay ? String(student.birthDay) : "",
+          birthMonth: student.birthMonth ? String(student.birthMonth) : "",
           englishLevel: student.englishLevel,
           lessonFormat: student.lessonFormat,
           defaultLessonDuration: student.defaultLessonDuration,

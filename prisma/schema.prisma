@@ -54,6 +54,8 @@ model Student {
   viberPhone            String?
   // Рік народження (вік рахується сам); isAdult — для дорослих без року
   birthYear             Int?
+  birthDay              Int?
+  birthMonth            Int?
   isAdult               Boolean   @default(false)
   englishLevel          EnglishLevel
   lessonFormat          LessonFormat

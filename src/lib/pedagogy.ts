@@ -49,9 +49,28 @@ export const PEDAGOGY = `МЕТОДИЧНІ ПРИНЦИПИ (загальні)
 - Матеріали для учня й батьків — без внутрішніх нотаток, відсотків, оцінок.
 - Не вигадуй факти про учня: даних мало — скажи це.`;
 
-export function ageInfo(s: { birthYear?: number | null; isAdult?: boolean | null }): string {
+// Повних років на сьогодні (враховує день і місяць, якщо відомі)
+export function ageYears(s: { birthYear?: number | null; birthDay?: number | null; birthMonth?: number | null }) {
+  if (!s.birthYear) return null;
+  const now = new Date();
+  const kyiv = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv", year: "numeric", month: "numeric", day: "numeric" })
+    .formatToParts(now)
+    .reduce<Record<string, number>>((acc, p) => (p.type !== "literal" ? { ...acc, [p.type]: Number(p.value) } : acc), {});
+  let age = kyiv.year - s.birthYear;
+  if (s.birthMonth && s.birthDay) {
+    if (kyiv.month < s.birthMonth || (kyiv.month === s.birthMonth && kyiv.day < s.birthDay)) age -= 1;
+  }
+  return age;
+}
+
+export function ageInfo(s: {
+  birthYear?: number | null;
+  birthDay?: number | null;
+  birthMonth?: number | null;
+  isAdult?: boolean | null;
+}): string {
   if (s.birthYear) {
-    const age = new Date().getFullYear() - s.birthYear;
+    const age = ageYears(s) ?? 0;
     const group =
       age <= 6
         ? "дошкільня"

@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import CheerBanner from "@/components/CheerBanner";
 import AutoRefresh from "@/components/AutoRefresh";
+import BirthdayCard, { type BirthdayPerson } from "@/components/BirthdayCard";
+import { ageYears } from "@/lib/pedagogy";
+import { normalizeViberPhone } from "@/lib/lesson-link";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +87,28 @@ export default async function HomePage() {
     orderBy: { startAt: "asc" },
   });
 
+  // Дні народження сьогодні (за київською датою)
+  const birthdayStudents = await prisma.student.findMany({
+    where: { isActive: true, birthDay: day, birthMonth: month + 1 },
+    orderBy: { firstName: "asc" },
+  });
+  const birthdays: BirthdayPerson[] = birthdayStudents.map((st: typeof birthdayStudents[number]) => {
+    const age = ageYears(st);
+    const isKid = age != null ? age < 18 : !st.isAdult;
+    const greeting = isKid
+      ? `${st.firstName}, з днем народження! 🎂🎉 Happy birthday! Бажаю тобі радості, чудових подарунків і багато нових цікавих англійських слів 😊`
+      : `${st.firstName}, вітаю з днем народження! 🎉 Happy birthday! Бажаю натхнення, здоров'я і успіхів — і в англійській теж 😊`;
+    return {
+      id: st.id,
+      name: `${st.firstName} ${st.lastName ?? ""}`.trim(),
+      age,
+      channel: st.contactChannel === "VIBER" ? "VIBER" : "TELEGRAM",
+      telegramUsername: st.telegramUsername ? st.telegramUsername.replace(/^@/, "").trim() : null,
+      viberPhone: normalizeViberPhone(st.viberPhone || st.phone),
+      greeting,
+    };
+  });
+
   // Урок вважається завершеним, якщо його відмічено проведеним або час уроку вже минув
   const isDone = (l: typeof todayLessons[number]) => l.status === "COMPLETED" || l.endAt <= now;
   const allDone = todayLessons.length > 0 && todayLessons.every(isDone);
@@ -117,6 +142,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-6">
       <AutoRefresh />
+      <BirthdayCard people={birthdays} />
       <CheerBanner />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
