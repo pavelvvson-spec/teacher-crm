@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { callClaude, journalToText } from "@/lib/anthropic";
 
 // Генерація відповіді ШІ може тривати 20-40 секунд
 export const maxDuration = 60;
@@ -26,7 +27,7 @@ function kyivDate(d: Date) {
 
 const SYSTEM_PROMPT = `Ти — досвідчений методист з англійської мови, який допомагає вчительці готуватися до індивідуальних онлайн-уроків.
 Пиши українською. Англійські слова, речення і вправи — англійською.
-Спирайся ЛИШЕ на дані про учня, що тобі дали. Якщо даних мало (немає нотаток про попередні уроки) — скажи про це одним реченням і склади універсальний план під рівень учня, нічого не вигадуючи про його минулі помилки чи теми.
+Спирайся ЛИШЕ на дані про учня, що тобі дали: портрет учня, журнал вчительки, нотатки до уроків. Журнал і портрет — найцінніше джерело: враховуй інтереси, слабкі місця і те, що працює з цим учнем. Якщо даних мало (немає нотаток про попередні уроки) — скажи про це одним реченням і склади універсальний план під рівень учня, нічого не вигадуючи про його минулі помилки чи теми.
 Враховуй тривалість уроку: таймінг блоків має сходитися з нею.
 Будь конкретним: готові питання, речення, слова, а не загальні поради.
 
@@ -45,17 +46,9 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const wish: string = typeof body?.wish === "string" ? body.wish.slice(0, 1000) : "";
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Не налаштовано ключ ШІ (ANTHROPIC_API_KEY у змінних Vercel)" },
-      { status: 500 }
-    );
-  }
-
   const lesson = await prisma.lesson.findUnique({
     where: { id },
-    include: { student: true, materials: true },
+    include: { student: { include: { journalEntries: true } }, materials: true },
   });
   if (!lesson) {
     return NextResponse.json({ error: "Урок не знайдено" }, { status: 404 });
@@ -96,6 +89,12 @@ export async function POST(
 Тривалість цього уроку: ${lesson.duration} хв
 Загальні нотатки про учня: ${s.notes || "немає"}
 
+ПОРТРЕТ УЧНЯ (підсумок ШІ з журналу${s.aiPortraitAt ? ", " + s.aiPortraitAt.toLocaleDateString("uk-UA", { timeZone: "Europe/Kyiv" }) : ""})
+${s.aiPortrait || "ще не складено"}
+
+ЖУРНАЛ ВЧИТЕЛЬКИ ПРО УЧНЯ (від старіших до новіших)
+${journalToText(s.journalEntries, 12000)}
+
 ЦЕЙ УРОК (${kyivDate(lesson.startAt)})
 Нотатка, яку вже написала вчителька: ${lesson.teacherNotes || "немає"}
 ДЗ, вже вписане до цього уроку: ${lesson.homework || "немає"}
@@ -107,43 +106,11 @@ ${historyText}
 ПОБАЖАННЯ ВЧИТЕЛЬКИ ДО ЦЬОГО УРОКУ
 ${wish || "немає"}`;
 
-  let res: Response;
-  try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5",
-        max_tokens: 3000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    });
-  } catch {
-    return NextResponse.json({ error: "Не вдалося зв'язатися з ШІ" }, { status: 502 });
+  const result = await callClaude(SYSTEM_PROMPT, userPrompt, 3000);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 502 });
   }
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("Anthropic API error", res.status, errText);
-    const hint =
-      res.status === 401
-        ? "неправильний ключ"
-        : res.status === 400 && errText.includes("credit")
-          ? "закінчився баланс у консолі Anthropic"
-          : `код ${res.status}`;
-    return NextResponse.json({ error: `ШІ повернув помилку: ${hint}` }, { status: 502 });
-  }
-
-  const data = await res.json();
-  const text: string = (data?.content ?? [])
-    .filter((c: { type: string }) => c.type === "text")
-    .map((c: { text: string }) => c.text)
-    .join("");
+  const text = result.text;
 
   let plan = text;
   let homework = "";

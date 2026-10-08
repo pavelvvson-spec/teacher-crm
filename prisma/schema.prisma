@@ -63,6 +63,10 @@ model Student {
   payments            Payment[]
   reminders           Reminder[]
   recurringSchedules  RecurringSchedule[]
+  journalEntries      StudentJournalEntry[]
+
+  aiPortrait          String?
+  aiPortraitAt        DateTime?
 }
 
 enum LessonStatus {
@@ -204,4 +208,22 @@ model LessonMaterial {
   title     String
   url       String
   createdAt DateTime     @default(now())
+}
+
+// Журнал учня: сирі записи для ШІ (текст, згодом голосові та Fireflies)
+enum JournalSource {
+  TEXT
+  VOICE
+  FIREFLIES
+}
+
+model StudentJournalEntry {
+  id        String        @id @default(cuid())
+  studentId String
+  student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  source    JournalSource @default(TEXT)
+  content   String
+  createdAt DateTime      @default(now())
+
+  @@index([studentId, createdAt])
 }
