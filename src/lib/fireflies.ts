@@ -53,9 +53,15 @@ export function verifyFirefliesRequest(
     }
   }
   const all = Array.from(headers.keys()).join(",");
+  const tokenInfo = urlToken
+    ? `token прийшов: довжина ${urlToken.trim().length}, а секрет у Vercel: довжина ${secret.length}` +
+      `, перші 2 символи збігаються: ${urlToken.trim().slice(0, 2) === secret.slice(0, 2) ? "так" : "ні"}`
+    : "token в адресі не прийшов";
   return {
     ok: false,
-    debug: seen.length ? `підпис не збігся: ${seen.join(", ")}` : `немає заголовка підпису; заголовки: ${all}`,
+    debug:
+      (seen.length ? `підпис не збігся: ${seen.join(", ")}` : `немає заголовка підпису; заголовки: ${all}`) +
+      ` | ${tokenInfo}`,
   };
 }
 
