@@ -28,11 +28,13 @@ export default function AddPaymentButton({
   studentName,
   lessons,
   lessonPrice,
+  primary = false,
 }: {
   studentId: string;
   studentName: string;
   lessons: UnpaidLesson[];
   lessonPrice: number;
+  primary?: boolean; // яскрава головна кнопка (для списку на сторінці оплат)
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -152,7 +154,11 @@ export default function AddPaymentButton({
     <>
       <button
         onClick={openModal}
-        className="px-3 py-1.5 bg-pink-50 text-pink-700 rounded-lg text-xs font-medium hover:bg-pink-100"
+        className={
+          primary
+            ? "px-3 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 whitespace-nowrap"
+            : "px-3 py-1.5 bg-pink-50 text-pink-700 rounded-lg text-xs font-medium hover:bg-pink-100"
+        }
       >
         Внести оплату
       </button>

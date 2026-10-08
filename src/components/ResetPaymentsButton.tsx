@@ -36,7 +36,7 @@ export default function ResetPaymentsButton() {
     <>
       <button
         onClick={openModal}
-        className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium hover:bg-red-100"
+        className="w-full text-left px-3 py-2 text-red-600 rounded-lg text-sm hover:bg-red-50"
       >
         Очистити оплати
       </button>

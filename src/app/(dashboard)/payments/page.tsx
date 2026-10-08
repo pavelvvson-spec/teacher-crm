@@ -2,10 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { calculateStudentBalance, allocatePayments } from "@/lib/payments-utils";
 import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 import ResetPaymentsButton from "@/components/ResetPaymentsButton";
-import AddPaymentButton from "@/components/AddPaymentButton";
-import PaymentsHistoryButton from "@/components/PaymentsHistoryButton";
 import MoneyCheckButton from "@/components/MoneyCheckButton";
-import StudentLedgerButton from "@/components/StudentLedgerButton";
+import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
+import PaymentsList, { type PaymentKind, type PaymentRow } from "@/components/PaymentsList";
 
 export const dynamic = "force-dynamic";
 
@@ -103,27 +102,28 @@ export default async function PaymentsPage() {
     };
   });
 
-  type Row = (typeof allStudentsWithBalance)[number];
-
-  // Колонка 1: поурочні, лише ті, у кого є борг або передоплата
-  const perLessonDebtors = allStudentsWithBalance
-    .filter((s) => s.isPerLesson && s.balance !== 0)
-    .sort((a, b) => b.balance - a.balance);
-
-  // Колонка 2: усі помісячні / потижневі, завжди
-  const periodicStudents = allStudentsWithBalance
-    .filter((s) => s.paymentFrequency && PERIODIC_FREQUENCIES.includes(s.paymentFrequency))
-    .sort((a, b) => b.balance - a.balance);
-
-  // Колонка 3: усі, хто платить наперед, завжди
-  const prepaidStudents = allStudentsWithBalance
-    .filter((s) => s.paymentFrequency === "MONTHLY_PREPAID")
-    .map((s) => ({
-      ...s,
+  // Один спільний список учнів для сторінки (тип оплати — для вкладок-фільтрів)
+  const rows: PaymentRow[] = allStudentsWithBalance.map((s) => {
+    const kind: PaymentKind = s.isPerLesson
+      ? "perLesson"
+      : s.paymentFrequency === "MONTHLY_PREPAID"
+        ? "prepaid"
+        : s.paymentFrequency && PERIODIC_FREQUENCIES.includes(s.paymentFrequency)
+          ? "periodic"
+          : "other";
+    return {
+      id: s.id,
+      fullName: `${s.firstName} ${s.lastName ?? ""}`.trim(),
+      balance: s.balance,
+      kind,
       lessonsLeft:
-        s.defaultLessonPrice > 0 ? Math.floor(Math.abs(s.balance) / s.defaultLessonPrice) : 0,
-    }))
-    .sort((a, b) => a.balance - b.balance);
+        kind === "prepaid" && s.balance < 0 && s.defaultLessonPrice > 0
+          ? Math.floor(Math.abs(s.balance) / s.defaultLessonPrice)
+          : null,
+      unpaidLessons: s.unpaidLessons,
+      lessonPrice: s.isPerLesson ? s.defaultLessonPrice : 0,
+    };
+  });
 
   const debtorsList = allStudentsWithBalance
     .filter((s) => s.balance > 0)
@@ -156,172 +156,63 @@ export default async function PaymentsPage() {
   const receivedPercent =
     monthForecast > 0 ? Math.min(100, Math.round((monthIncome / monthForecast) * 100)) : 0;
 
-  function balanceLabel(balance: number) {
-    if (balance > 0) return `Борг: ${balance} грн`;
-    if (balance < 0) return `Передоплата: ${Math.abs(balance)} грн`;
-    return "Усе оплачено";
-  }
-
-  function balanceColor(balance: number) {
-    if (balance > 0) return "text-red-600";
-    if (balance < 0) return "text-pink-600";
-    return "text-green-600";
-  }
-
-  // Рядок учня у два поверхи:
-  // зверху ім'я і сума, знизу всі кнопки (Історія, Журнал, Внести оплату)
-  function renderRowLayout(s: Row, amountNode: React.ReactNode) {
-    const fullName = `${s.firstName} ${s.lastName ?? ""}`.trim();
-    return (
-      <div key={s.id} className="py-3 space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <p className="font-medium text-gray-800">{fullName}</p>
-          <div className="text-right shrink-0">{amountNode}</div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PaymentsHistoryButton studentId={s.id} studentName={fullName} />
-          <StudentLedgerButton studentId={s.id} studentName={fullName} />
-          <AddPaymentButton
-            studentId={s.id}
-            studentName={fullName}
-            lessons={s.unpaidLessons}
-            lessonPrice={s.isPerLesson ? s.defaultLessonPrice : 0}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  function renderStudentRow(s: Row) {
-    return renderRowLayout(
-      s,
-      <p className={`font-semibold text-sm sm:text-base ${balanceColor(s.balance)}`}>
-        {balanceLabel(s.balance)}
-      </p>
-    );
-  }
-
-  function renderPrepaidRow(s: (typeof prepaidStudents)[number]) {
-    return renderRowLayout(
-      s,
-      s.balance > 0 ? (
-        <p className="font-semibold text-sm sm:text-base text-red-600">Борг: {s.balance} грн</p>
-      ) : (
-        <>
-          <p className="font-semibold text-sm sm:text-base text-purple-700">
-            Залишилось: {Math.abs(s.balance)} грн
-          </p>
-          <p className="text-xs text-purple-500">~{s.lessonsLeft} ур.</p>
-        </>
-      )
-    );
-  }
-
-  function renderAllRow(s: Row) {
-    const text = s.balance === 0 ? "Баланс 0" : balanceLabel(s.balance);
-    const color = s.balance === 0 ? "text-gray-500" : balanceColor(s.balance);
-    return renderRowLayout(s, <p className={`font-semibold text-sm ${color}`}>{text}</p>);
-  }
+  const monthName = new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", month: "long" }).format(new Date());
+  const uah = (n: number) => `${n.toLocaleString("uk-UA")} грн`;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-2xl font-bold text-gray-800">Оплати</h1>
-        <div className="flex items-center gap-2">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Оплати</h1>
+          <p className="text-sm text-gray-400 capitalize">{monthName}</p>
+        </div>
+        <div className="flex items-center gap-1">
           <MoneyCheckButton />
-          <ResetPaymentsButton />
+          <PaymentsMoreMenu>
+            <ResetPaymentsButton />
+          </PaymentsMoreMenu>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
           <p className="text-[11px] sm:text-sm text-gray-500 mb-1 leading-tight">
-            <span className="sm:hidden">Борг</span>
+            <span className="sm:hidden">Борги</span>
             <span className="hidden sm:inline">Загальний борг</span>
           </p>
-          <details>
-            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex flex-wrap items-baseline gap-x-2">
-              <span className="text-base sm:text-2xl font-bold text-red-600">{totalDebt} грн</span>
-              {debtorsList.length > 0 && (
-                <span className="text-xs sm:text-sm italic text-pink-600 underline decoration-dotted">Хто?</span>
-              )}
-            </summary>
-            {debtorsList.length > 0 && (
-              <ul className="mt-2 space-y-1 text-xs sm:text-sm text-gray-800">
-                {debtorsList.map((s) => (
-                  <li key={s.id}>{`${s.firstName} ${s.lastName ?? ""}`.trim()}</li>
-                ))}
-              </ul>
-            )}
-          </details>
+          <p className={`text-base sm:text-2xl font-bold ${totalDebt > 0 ? "text-red-600" : "text-gray-800"}`}>
+            {uah(totalDebt)}
+          </p>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">
+            {debtorsList.length === 0 ? "ніхто не винен" : `учнів з боргом: ${debtorsList.length}`}
+          </p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
           <p className="text-[11px] sm:text-sm text-gray-500 mb-1 leading-tight">
-            <span className="sm:hidden">Оплачено</span>
-            <span className="hidden sm:inline">Оплачено за поточний місяць</span>
+            <span className="sm:hidden">Отримано</span>
+            <span className="hidden sm:inline">Отримано цього місяця</span>
           </p>
-          <p className="text-base sm:text-2xl font-bold text-green-600">{monthIncome} грн</p>
+          <p className="text-base sm:text-2xl font-bold text-green-600">{uah(monthIncome)}</p>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">
+            {receivedPercent}% від прогнозу
+          </p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
           <p className="text-[11px] sm:text-sm text-gray-500 mb-1 leading-tight">
             <span className="sm:hidden">Ще зайде</span>
-            <span className="hidden sm:inline">Ще може зайти за місяць</span>
+            <span className="hidden sm:inline">Ще може зайти</span>
           </p>
-          <p className="text-base sm:text-2xl font-bold text-pink-600">{potentialLeft} грн</p>
+          <p className="text-base sm:text-2xl font-bold text-gray-800">{uah(potentialLeft)}</p>
           <div className="mt-2 h-1.5 sm:h-2 rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full bg-green-500" style={{ width: `${receivedPercent}%` }} />
           </div>
-          <p className="text-[10px] sm:text-xs text-gray-500 mt-1 leading-tight">
-            <span className="sm:hidden">{receivedPercent}% з {monthForecast}</span>
-            <span className="hidden sm:inline">
-              надійшло {monthIncome} з {monthForecast} грн прогнозу ({receivedPercent}%)
-            </span>
+          <p className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">
+            прогноз {uah(monthForecast)}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Поурочна оплата</h2>
-          <p className="text-xs text-gray-400 mb-3">Показані ті, у кого є борг або передоплата</p>
-          {perLessonDebtors.length === 0 ? (
-            <p className="text-gray-500">Боргів немає — усе оплачено.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">{perLessonDebtors.map(renderStudentRow)}</div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Помісячна / потижнева оплата</h2>
-          <p className="text-xs text-gray-400 mb-3">Усі учні з такою оплатою</p>
-          {periodicStudents.length === 0 ? (
-            <p className="text-gray-500">Немає учнів з такою оплатою.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">{periodicStudents.map(renderStudentRow)}</div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-1">Передоплата на місяць</h2>
-          <p className="text-xs text-gray-400 mb-3">Усі учні, які платять наперед</p>
-          {prepaidStudents.length === 0 ? (
-            <p className="text-gray-500">Немає учнів з оплатою наперед.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">{prepaidStudents.map(renderPrepaidRow)}</div>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-lg font-semibold text-gray-800 mb-1">Усі учні</h2>
-        <p className="text-sm text-gray-500 mb-3">
-          Тут є всі активні учні, навіть з нульовим балансом. «Внести оплату» працює для будь-кого, «Журнал» показує всі
-          уроки й оплати.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 divide-y md:divide-y-0 divide-gray-100">
-          {allStudentsWithBalance.map(renderAllRow)}
-        </div>
-      </div>
+      <PaymentsList rows={rows} />
     </div>
   );
 }

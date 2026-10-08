@@ -41,9 +41,11 @@ function formatDate(iso: string, withTime: boolean): string {
 export default function StudentLedgerButton({
   studentId,
   studentName,
+  compact = false,
 }: {
   studentId: string;
   studentName: string;
+  compact?: boolean; // маленька кнопка-іконка (для списку на сторінці оплат)
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -71,9 +73,22 @@ export default function StudentLedgerButton({
       <button
         type="button"
         onClick={load}
-        className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200"
+        title="Журнал уроків і оплат"
+        aria-label="Журнал уроків і оплат"
+        className={
+          compact
+            ? "w-9 h-9 inline-flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            : "px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200"
+        }
       >
-        Журнал
+        {compact ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 6h13M8 12h13M8 18h13" />
+            <path d="M3 6h.01M3 12h.01M3 18h.01" />
+          </svg>
+        ) : (
+          "Журнал"
+        )}
       </button>
 
       {open && (
