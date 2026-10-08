@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ResetAllStudentsButton from "@/components/ResetAllStudentsButton";
+import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -15,48 +16,54 @@ export default async function StudentsPage() {
   const inactiveCount = students.length - activeCount;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-semibold text-gray-800">Учні</h1>
-        <div className="flex items-center gap-2">
-          <ResetAllStudentsButton />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-800">Учні</h1>
+          <p className="text-sm text-gray-400">
+            {activeCount} активних{inactiveCount > 0 ? ` · ${inactiveCount} неактивних` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
           <Link
             href="/students/new"
-            className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
+            className="px-4 py-2.5 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
           >
             + Додати учня
           </Link>
+          <PaymentsMoreMenu>
+            <ResetAllStudentsButton />
+          </PaymentsMoreMenu>
         </div>
       </div>
-
-      <p className="text-sm text-gray-500">
-        Всього: {students.length} · Активних: {activeCount} · Неактивних: {inactiveCount}
-      </p>
 
       {students.length === 0 ? (
         <p className="text-gray-500">Учнів ще немає. Додай першого!</p>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {students.map((student: typeof students[number]) => (
             <Link
               key={student.id}
               href={`/students/${student.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-gray-50"
+              className={`flex items-center gap-3 bg-white rounded-xl shadow-sm px-4 py-3 hover:bg-pink-50/40 hover:shadow ${
+                student.isActive ? "" : "opacity-60"
+              }`}
             >
-              <div>
-                <p className="font-medium text-gray-800">
-                  №{student.displayNumber} {student.firstName} {student.lastName ?? ""}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Рівень: {student.englishLevel} ·{" "}
-                  {student.lessonFormat === "ONLINE" ? "Онлайн" : "Офлайн"}
-                </p>
-              </div>
+              <span className="w-7 text-xs text-gray-400 tabular-nums shrink-0">№{student.displayNumber}</span>
+              <span className="flex-1 min-w-0 font-medium text-gray-800 truncate">
+                {student.firstName} {student.lastName ?? ""}
+              </span>
+              {student.lessonFormat !== "ONLINE" && (
+                <span className="text-xs text-gray-400 shrink-0">офлайн</span>
+              )}
               {!student.isActive && (
-                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">
-                  Неактивний
+                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md shrink-0">
+                  неактивний
                 </span>
               )}
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 shrink-0">
+                {student.englishLevel}
+              </span>
             </Link>
           ))}
         </div>
