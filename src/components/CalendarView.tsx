@@ -432,13 +432,13 @@ export default function CalendarView({ students }: { students: Student[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="order-1 flex gap-1 bg-gray-100 rounded-xl p-1">
           {(["day", "week", "month"] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium ${
+              className={`px-2.5 sm:px-4 py-1.5 rounded-lg text-sm font-medium ${
                 viewMode === mode ? "bg-white text-pink-700 shadow-sm" : "text-gray-600 hover:text-gray-800"
               }`}
             >
@@ -447,7 +447,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
           ))}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="order-3 sm:order-2 w-full sm:w-auto flex items-center gap-1">
           <button
             onClick={goToPrevious}
             aria-label="Назад"
@@ -455,7 +455,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
           >
             ←
           </button>
-          <span className="min-w-[9.5rem] text-center font-medium text-gray-800 first-letter:uppercase">
+          <span className="flex-1 sm:flex-none sm:min-w-[9.5rem] text-center font-medium text-gray-800 first-letter:uppercase">
             {periodLabel()}
           </span>
           <button
@@ -475,12 +475,13 @@ export default function CalendarView({ students }: { students: Student[] }) {
           )}
         </div>
 
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="order-2 sm:order-3 flex items-center gap-1 ml-auto">
           <button
             onClick={() => setShowForm(true)}
-            className="px-4 py-2.5 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
+            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700 whitespace-nowrap"
           >
-            + Створити урок
+            <span className="sm:hidden">+ Урок</span>
+            <span className="hidden sm:inline">+ Створити урок</span>
           </button>
           <PaymentsMoreMenu>
             <SyncAllSchedulesButton />
@@ -489,7 +490,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+      <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-[11px] sm:text-xs text-gray-500">
         {LEGEND.map((l) => (
           <span key={l.label} className="inline-flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${l.dot}`} />
