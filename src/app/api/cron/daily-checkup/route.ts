@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendDailyCheckup } from "@/lib/daily-checkup";
 import { syncCalendarSafely } from "@/lib/google-calendar";
 import { pollRecentMeetings, isFirefliesConfigured } from "@/lib/fireflies";
+import { notifyMethodologyQuestions, maybeCreateFollowupQuestions } from "@/lib/methodology";
 
 // Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
 export const maxDuration = 60;
@@ -23,5 +24,12 @@ export async function GET(request: NextRequest) {
     }
   }
   const result = await sendDailyCheckup();
+  // Нагадування про анкету / нові питання щодо методики — окремим помітним повідомленням
+  try {
+    await maybeCreateFollowupQuestions();
+    await notifyMethodologyQuestions();
+  } catch (e) {
+    console.error("Methodology notify error", e);
+  }
   return NextResponse.json(result);
 }

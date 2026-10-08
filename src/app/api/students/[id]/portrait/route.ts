@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { callClaude, journalToText } from "@/lib/anthropic";
+import { methodContext, ageInfo } from "@/lib/pedagogy";
 
 // Генерація відповіді ШІ може тривати 20-40 секунд
 export const maxDuration = 60;
@@ -64,6 +65,7 @@ export async function POST(
           .join("\n");
 
   const userPrompt = `УЧЕНЬ: ${student.firstName}
+Вік: ${ageInfo(student)}
 Рівень у CRM: ${student.englishLevel}
 Тривалість уроку: ${student.defaultLessonDuration} хв
 Загальні нотатки в картці: ${student.notes || "немає"}
@@ -74,7 +76,7 @@ ${journalToText(student.journalEntries)}
 НОТАТКИ ДО УРОКІВ І ДЗ (останні)
 ${lessonsText}`;
 
-  const result = await callClaude(SYSTEM_PROMPT, userPrompt, 2000);
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), userPrompt, 2000);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 502 });
   }

@@ -34,8 +34,15 @@ export async function transcribeTelegramFile(fileId: string): Promise<Transcribe
 
   // 3) Розпізнаємо
   const fileName = filePath.split("/").pop() || "voice.ogg";
+  return transcribeAudio(audio, fileName.endsWith(".oga") ? fileName.replace(/\.oga$/, ".ogg") : fileName);
+}
+
+// Розпізнає будь-який аудіофайл (голосове з Telegram або запис з браузера)
+export async function transcribeAudio(audio: ArrayBuffer, fileName: string): Promise<TranscribeResult> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return { ok: false, error: "Не налаштовано ключ розпізнавання голосу (GROQ_API_KEY у Vercel)" };
   const form = new FormData();
-  form.append("file", new Blob([audio]), fileName.endsWith(".oga") ? fileName.replace(/\.oga$/, ".ogg") : fileName);
+  form.append("file", new Blob([audio]), fileName);
   form.append("model", process.env.GROQ_STT_MODEL || "whisper-large-v3");
   form.append("language", "uk");
   form.append(

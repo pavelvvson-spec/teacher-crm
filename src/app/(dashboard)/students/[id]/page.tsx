@@ -39,6 +39,8 @@ export default async function StudentDetailPage({
           telegramUsername: student.telegramUsername ?? "",
           contactChannel: student.contactChannel,
           viberPhone: student.viberPhone ?? "",
+          birthYear: student.birthYear ? String(student.birthYear) : "",
+          isAdult: student.isAdult,
           englishLevel: student.englishLevel,
           lessonFormat: student.lessonFormat,
           defaultLessonDuration: student.defaultLessonDuration,

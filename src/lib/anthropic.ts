@@ -3,9 +3,14 @@
 
 export type ClaudeResult = { ok: true; text: string } | { ok: false; error: string };
 
+// Блок повідомлення: текст або картинка (base64)
+export type ClaudeContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+
 export async function callClaude(
   system: string,
-  userPrompt: string,
+  userPrompt: string | ClaudeContentBlock[],
   maxTokens = 3000
 ): Promise<ClaudeResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;

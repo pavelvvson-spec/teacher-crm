@@ -27,7 +27,9 @@ CRM для онлайн-уроків англійської Саші (Олекс
 - **Fireflies → журнал**: після уроку вебхук → CRM бере транскрипт → Claude робить короткий конспект → запис у журнал учня + повідомлення вчительці в Telegram (з кнопкою «Прибрати з журналу»). Підстраховка — щоденна перевірка в cron і кнопка в налаштуваннях.
 - **Посилання на Zoom учню**: кнопка «🔗 Надіслати посилання Zoom» у вікні уроку. Telegram + підключений бот → автоматично; Viber або непідключений Telegram → відкривається месенджер з готовим текстом (Viber-бот платний — €100/міс, тому не використовується). У картці учня: `contactChannel` (TELEGRAM/VIBER) і `viberPhone`.
 
-Налаштування й статуси всіх інтеграцій — сторінка CRM **Telegram** (`/settings/telegram`).
+- **Методика**: усі ШІ-запити отримують загальну методичну інструкцію (`src/lib/pedagogy.ts`, вікові групи, помилки, тон) + «Мою методику» вчительки (`Settings.methodology`, має пріоритет) + вік учня (`Student.birthYear` / `isAdult`). Методика формується з анкети (15 питань), скриньки ідей (текст, голос, скріншоти; у боті — «в методику: …» або фото) і нових питань, які ШІ складає зі спостережень на уроках (від 5 спостережень). ШІ ніколи не змінює методику без «Прийняти» вчительки. Нагадування — у вечірньому cron.
+
+Налаштування й статуси всіх інтеграцій — сторінка CRM **Налаштування** (`/settings/telegram`).
 
 ## Де що в коді
 
@@ -44,12 +46,13 @@ CRM для онлайн-уроків англійської Саші (Олекс
 | Zoom-посилання | `src/lib/lesson-link.ts`, `src/app/api/lessons/[id]/send-link`, `src/components/SendLinkButton.tsx` |
 | Календар і вікно уроку | `src/components/CalendarView.tsx`, підготовка — `src/components/LessonsPrepView.tsx` |
 | Картка учня | `src/components/StudentForm.tsx`, `src/app/(dashboard)/students/[id]/page.tsx` |
+| Методика | `src/lib/pedagogy.ts`, `src/lib/methodology.ts`, `src/app/api/methodology/*`, `src/components/MethodologyPanel.tsx` |
 | Cron | `vercel.json` (щоденний чекап; там же синхронізація календаря й перевірка Fireflies) |
 | Захист сторінок | `src/proxy.ts` — усе закрито входом, крім публічних шляхів (вебхуки, cron, логін) |
 
 ## Змінні у Vercel (лише назви)
 
-`DATABASE_URL`, `JWT_SECRET`, `CRON_SECRET`, `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_APP_URL`, `BLOB_READ_WRITE_TOKEN`,
+`DATABASE_URL`, `JWT_SECRET`, `CRON_SECRET`, `TELEGRAM_BOT_TOKEN`, `NEXT_PUBLIC_APP_URL`, `BLOB2_READ_WRITE_TOKEN` (сховище файлів),
 `ANTHROPIC_API_KEY` (+ необов'язково `ANTHROPIC_MODEL`), `GROQ_API_KEY`,
 `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY` (або `GOOGLE_SERVICE_ACCOUNT_JSON`), `GOOGLE_CALENDAR_ID`, `DEFAULT_MEETING_LINK`,
 `FIREFLIES_API_KEY`, `FIREFLIES_WEBHOOK_SECRET`. Необов'язково: `TELEGRAM_WEBHOOK_SECRET`.

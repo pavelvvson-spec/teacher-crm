@@ -52,6 +52,9 @@ model Student {
   // Куди надсилати посилання на урок: "TELEGRAM" або "VIBER"
   contactChannel        String    @default("TELEGRAM")
   viberPhone            String?
+  // Рік народження (вік рахується сам); isAdult — для дорослих без року
+  birthYear             Int?
+  isAdult               Boolean   @default(false)
   englishLevel          EnglishLevel
   lessonFormat          LessonFormat
   defaultLessonDuration Int       // у хвилинах
@@ -192,6 +195,10 @@ model Settings {
   lastCheckupSentAt         DateTime?
   lastSummarySentAt         DateTime?
   lastMonthlyReportSentAt   DateTime?
+  // «Моя методика» вчительки — документ, який ШІ враховує в усіх порадах
+  methodology               String?
+  methodologyUpdatedAt      DateTime?
+  methodologyNotifiedAt     DateTime?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 }
@@ -247,4 +254,30 @@ model AssistantMessage {
   createdAt        DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// Питання анкети «Моя методика» (стартова анкета і нові питання з уроків)
+model MethodologyQuestion {
+  id         String    @id @default(cuid())
+  batch      String    // "onboarding" або "followup-<дата>"
+  order      Int
+  question   String
+  answer     String?
+  status     String    @default("OPEN") // OPEN | ANSWERED | SKIPPED | MERGED
+  answeredAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([status])
+}
+
+// Скринька ідей для методики + спостереження ШІ з уроків
+model MethodologyInbox {
+  id        String    @id @default(cuid())
+  kind      String    // TEXT | VOICE | IMAGE | OBSERVATION
+  content   String
+  imageUrl  String?
+  usedAt    DateTime? // коли вбудовано в методику або перетворено на питання
+  createdAt DateTime  @default(now())
+
+  @@index([kind, usedAt])
 }

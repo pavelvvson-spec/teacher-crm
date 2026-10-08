@@ -9,6 +9,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { callClaude } from "@/lib/anthropic";
+import { methodContext, ageInfo } from "@/lib/pedagogy";
+import { addObservations } from "@/lib/methodology";
 import { sendLongTelegramMessage, sendTelegramHtmlMessage, escapeTelegramHtml } from "@/lib/telegram";
 
 const API = "https://api.fireflies.ai/graphql";
@@ -195,6 +197,7 @@ const SUMMARY_PROMPT = `Ти — асистент вчительки англі�
   "student_pct": 30,
   "errors": [{"wrong": "фраза учня з помилкою", "right": "правильний варіант"}],
   "errors_note": "",
+  "method_observations": ["0-2 прийоми чи рішення ВЧИТЕЛЬКИ на цьому уроці, яких НЕМАЄ в її методиці нижче (наприклад: «на уроці з Ліною пояснювала кольори через малювання»). Лише явні, помітні прийоми; якщо нічого нового — порожній масив"],
   "advice": "1-2 короткі конкретні поради ВЧИТЕЛЬЦІ (на «ти», тепло, як колега) щодо того, як вести уроки з цим учнем — темп, хто більше говорить, типи запитань, що спрацювало"
 }
 errors — лише реальні помилки в англійських фразах учня (максимум 5, найтиповіші). Не записуй сюди неточності розпізнавання. Якщо учень майже не говорив англійською або розпізнавання надто погане (часто з малими дітьми) — errors: [] і в errors_note одне речення чому.
@@ -230,7 +233,7 @@ export async function processFirefliesMeeting(meetingId: string, notify = true):
   const shares = talkShares(t);
   const input = `ПРИБЛИЗНА ЧАСТКА МОВЛЕННЯ УЧНЯ (автоматично): ${shares ? `${shares.studentPct}%` : "невідомо"}
 
-УЧЕНЬ: ${name}, рівень ${lesson.student.englishLevel}
+УЧЕНЬ: ${name}, вік ${ageInfo(lesson.student)}, рівень ${lesson.student.englishLevel}
 Нотатки про учня: ${lesson.student.notes || "немає"}
 УРОК: ${dateLabel}, ${Math.round(Number(t.duration ?? 0))} хв
 План/нотатка вчительки до уроку: ${lesson.teacherNotes ? lesson.teacherNotes.slice(0, 2000) : "немає"}
@@ -238,7 +241,7 @@ export async function processFirefliesMeeting(meetingId: string, notify = true):
 ТРАНСКРИПТ
 ${transcriptToText(t)}`;
 
-  const ai = await callClaude(SUMMARY_PROMPT, input, 2000);
+  const ai = await callClaude(SUMMARY_PROMPT + (await methodContext()), input, 2200);
   if (!ai.ok) {
     if (notify) await notifyTeacher(`⚠️ Не вдалося обробити запис уроку з ${name}: ${ai.error}`);
     return { status: "skipped", reason: ai.error };
@@ -254,6 +257,7 @@ ${transcriptToText(t)}`;
     errors?: { wrong?: string; right?: string }[];
     errors_note?: string;
     advice?: string;
+    method_observations?: string[];
   };
   let parsed: Analysis | null = null;
   const st = ai.text.indexOf("{");
@@ -292,6 +296,14 @@ ${transcriptToText(t)}`;
     .map((e) => ({ wrong: String(e.wrong).trim(), right: String(e.right).trim() }));
   const errorsNote = (parsed?.errors_note ?? "").trim();
   const advice = (parsed?.advice ?? "").trim();
+
+  // Нові прийоми вчительки → скринька методики (з них згодом з'являться питання)
+  try {
+    const obs = (parsed?.method_observations ?? []).map(String).filter(Boolean).slice(0, 2);
+    if (obs.length) await addObservations(obs.map((o) => `${o} (урок з ${name}, ${dateLabel})`));
+  } catch (e) {
+    console.error("Methodology observations error", e);
+  }
 
   // Попередній урок цього учня — для порівняння частки мовлення
   const prev = await prisma.studentJournalEntry.findFirst({

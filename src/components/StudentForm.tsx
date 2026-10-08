@@ -12,6 +12,8 @@ type StudentFormValues = {
   telegramUsername: string;
   contactChannel: string;
   viberPhone: string;
+  birthYear: string;
+  isAdult: boolean;
   englishLevel: string;
   lessonFormat: string;
   defaultLessonDuration: number;
@@ -43,6 +45,8 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
     telegramUsername: initialValues?.telegramUsername ?? "",
     contactChannel: initialValues?.contactChannel ?? "TELEGRAM",
     viberPhone: initialValues?.viberPhone ?? "",
+    birthYear: initialValues?.birthYear ?? "",
+    isAdult: initialValues?.isAdult ?? false,
     englishLevel: initialValues?.englishLevel ?? "A1",
     lessonFormat: initialValues?.lessonFormat ?? "ONLINE",
     defaultLessonDuration: initialValues?.defaultLessonDuration ?? 60,
@@ -213,6 +217,28 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             placeholder="Якщо порожньо — береться «Телефон»"
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Рік народження</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={values.birthYear}
+            onChange={(e) => setValues({ ...values, birthYear: e.target.value })}
+            placeholder="Наприклад, 2018"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+          />
+          <label className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              checked={values.isAdult}
+              onChange={(e) => setValues({ ...values, isAdult: e.target.checked })}
+            />
+            <span className="text-sm text-gray-600">Дорослий (якщо рік не вказуєте)</span>
+          </label>
+          {values.birthYear && Number(values.birthYear) > 1920 && (
+            <p className="text-xs text-gray-400 mt-1">≈ {new Date().getFullYear() - Number(values.birthYear)} р.</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Рівень англійської</label>

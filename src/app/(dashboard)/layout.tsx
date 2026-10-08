@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: "/lessons", label: "Підготовка до уроку" },
   { href: "/payments", label: "Оплати" },
   { href: "/reports", label: "Звіти" },
-  { href: "/settings/telegram", label: "Telegram" },
+  { href: "/settings/telegram", label: "Налаштування" },
 ];
 
 // Нижня панель на телефоні: 4 головні сторінки + «Ще»
@@ -27,7 +27,7 @@ const BOTTOM_MAIN = [
 const BOTTOM_MORE = [
   { href: "/lessons", label: "Підготовка до уроку" },
   { href: "/reports", label: "Звіти" },
-  { href: "/settings/telegram", label: "Telegram" },
+  { href: "/settings/telegram", label: "Налаштування" },
 ];
 
 // Сторінки першого рівня: на них кнопка «Назад» не потрібна

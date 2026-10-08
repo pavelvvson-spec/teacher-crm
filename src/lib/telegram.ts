@@ -35,7 +35,8 @@ export async function sendTelegramMessage(
 
 export type TelegramInlineButton = {
   text: string;
-  callback_data: string;
+  callback_data?: string;
+  url?: string;
 };
 
 export async function sendTelegramMessageWithButtons(
@@ -262,5 +263,25 @@ export async function sendTelegramHtmlMessage(
     } else {
       await sendTelegramMessage(chatId, parts[i]);
     }
+  }
+}
+
+// Завантажує файл, надісланий у Telegram (фото, документ)
+export async function downloadTelegramFile(
+  fileId: string
+): Promise<{ data: ArrayBuffer; path: string } | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  try {
+    const meta = await fetch(`${TELEGRAM_API}${token}/getFile?file_id=${encodeURIComponent(fileId)}`).then((r) =>
+      r.json()
+    );
+    const path: string | undefined = meta?.result?.file_path;
+    if (!path) return null;
+    const res = await fetch(`https://api.telegram.org/file/bot${token}/${path}`);
+    if (!res.ok) return null;
+    return { data: await res.arrayBuffer(), path };
+  } catch {
+    return null;
   }
 }

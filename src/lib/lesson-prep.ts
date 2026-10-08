@@ -1,6 +1,7 @@
 // Генерація плану уроку з ШІ — спільна логіка для кнопки в CRM і Telegram-помічника.
 import { prisma } from "@/lib/prisma";
 import { callClaude, journalToText } from "@/lib/anthropic";
+import { methodContext, ageInfo } from "@/lib/pedagogy";
 
 const STATUS_UA: Record<string, string> = {
   SCHEDULED: "заплановано",
@@ -85,6 +86,7 @@ export async function generateLessonPrep(id: string, wish: string): Promise<Less
 
 УЧЕНЬ
 Ім'я: ${s.firstName}
+Вік: ${ageInfo(s)}
 Рівень англійської: ${s.englishLevel}
 Формат: ${lesson.format === "ONLINE" ? "онлайн" : "офлайн"}
 Тривалість цього уроку: ${lesson.duration} хв
@@ -107,7 +109,7 @@ ${historyText}
 ПОБАЖАННЯ ВЧИТЕЛЬКИ ДО ЦЬОГО УРОКУ
 ${wish || "немає"}`;
 
-  const result = await callClaude(SYSTEM_PROMPT, userPrompt, 3000);
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), userPrompt, 3000);
   if (!result.ok) {
     return { ok: false, error: result.error };
   }

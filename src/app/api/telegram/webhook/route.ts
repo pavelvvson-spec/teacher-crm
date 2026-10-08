@@ -11,6 +11,9 @@ import { checkAndMaybeSendSummary, settleStudentPeriodicPayments } from "@/lib/d
 import { calculateStudentBalance } from "@/lib/payments-utils";
 import { handleTeacherMessage, handleAssistantCallback } from "@/lib/teacher-assistant";
 import { transcribeTelegramFile } from "@/lib/transcribe";
+import { downloadTelegramFile } from "@/lib/telegram";
+import { addInbox } from "@/lib/methodology";
+import { put } from "@vercel/blob";
 import { escapeTelegramHtml } from "@/lib/telegram";
 
 // Відповідь ШІ-помічника може тривати до ~30 секунд
@@ -194,6 +197,30 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error("Teacher assistant error", e);
         await sendTelegramMessage(chatId, "⚠️ Сталася помилка. Спробуйте ще раз трохи пізніше.");
+      }
+    } else if (Array.isArray(message.photo) && message.photo.length > 0) {
+      // Фото / скріншот від вчительки → скринька методики
+      try {
+        const largest = message.photo[message.photo.length - 1];
+        const file = await downloadTelegramFile(largest.file_id);
+        if (!file) {
+          await sendTelegramMessage(chatId, "⚠️ Не вдалося отримати фото з Telegram.");
+        } else {
+          const ext = file.path.split(".").pop() || "jpg";
+          const blob = await put(`methodology/tg-${Date.now()}.${ext}`, new Blob([file.data], { type: "image/jpeg" }), {
+            access: "public",
+            token: process.env.BLOB2_READ_WRITE_TOKEN,
+          });
+          const caption = typeof message.caption === "string" ? message.caption.trim() : "";
+          await addInbox("IMAGE", caption || "Скріншот з Telegram", blob.url);
+          await sendTelegramMessage(
+            chatId,
+            "🖼 Додала фото в скриньку методики. Вбудувати: Налаштування → Моя методика → «Оновити методику»."
+          );
+        }
+      } catch (e) {
+        console.error("Photo to methodology error", e);
+        await sendTelegramMessage(chatId, "⚠️ Не вдалося зберегти фото. Спробуйте ще раз.");
       }
     } else if (message.voice || message.audio) {
       const media = message.voice ?? message.audio;

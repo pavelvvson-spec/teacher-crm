@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { isCalendarConfigured, serviceAccountEmail } from "@/lib/google-calendar";
 import CalendarSyncButton from "@/components/CalendarSyncButton";
 import { isFirefliesConfigured } from "@/lib/fireflies";
+import MethodologyPanel from "@/components/MethodologyPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,9 @@ export default async function TelegramSettingsPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-800">Налаштування Telegram</h1>
+      <h1 className="text-2xl font-semibold text-gray-800">Налаштування</h1>
+
+      <MethodologyPanel />
 
       <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
         <h2 className="text-lg font-semibold text-gray-800">Вечірній чекап для вчителя</h2>

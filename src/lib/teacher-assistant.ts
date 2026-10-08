@@ -7,6 +7,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { callClaude, journalToText } from "@/lib/anthropic";
 import { generateLessonPrep } from "@/lib/lesson-prep";
+import { methodContext, ageInfo } from "@/lib/pedagogy";
+import { addInbox } from "@/lib/methodology";
 import {
   sendTelegramMessage,
   sendTelegramTyping,
@@ -38,7 +40,7 @@ function parseJson<T>(text: string): T | null {
 }
 
 type Route = {
-  action: "journal" | "advice" | "prep" | "chat" | "clarify";
+  action: "journal" | "advice" | "prep" | "chat" | "clarify" | "methodology";
   student: number | null;
   journal_text: string;
   candidates: number[];
@@ -51,6 +53,7 @@ const ROUTER_PROMPT = `Ти — диспетчер ШІ-помічника вч�
 - "advice" — вчителька питає поради, думки або аналізу щодо конкретного учня (можливо, разом з новою інформацією).
 - "prep" — вчителька просить підготувати/спланувати урок для конкретного учня.
 - "chat" — загальне питання без конкретного учня (методика, ідеї, тощо) або просто розмова.
+- "methodology" — вчителька ділиться СВОЇМ загальним принципом чи прийомом викладання (не про конкретного учня) і хоче, щоб це увійшло в її методику. У journal_text — цей принцип стисло, від її імені.
 - "clarify" — повідомлення стосується учня, але неможливо зрозуміти якого (кілька учнів з таким ім'ям, або ім'я не знайдено в списку).
 
 student — номер учня (№) зі списку або null. Якщо в новому повідомленні учня не названо, але з розмови зрозуміло, що йдеться про того самого учня, — використай його.
@@ -116,6 +119,16 @@ export async function handleTeacherMessage(
     data: { role: "user", content: text.slice(0, 8000), telegramUpdateId: updateId },
   });
 
+  // «в методику: …» — одразу в скриньку методики, без ШІ
+  const methodMatch = text.match(/^\s*(?:в|у|до)\s+методик\S*\s*[:,\-–—]?\s*([\s\S]+)$/i);
+  if (methodMatch && methodMatch[1].trim()) {
+    await addInbox(source === "VOICE" ? "VOICE" : "TEXT", methodMatch[1].trim());
+    const reply = "✓ Додала в скриньку методики. Вбудувати: Налаштування → Моя методика → «Оновити методику».";
+    await saveAssistantReply(reply, null);
+    await sendTelegramMessage(chatId, escapeTelegramHtml(reply));
+    return;
+  }
+
   await sendTelegramTyping(chatId);
 
   const students = await prisma.student.findMany({
@@ -157,6 +170,16 @@ ${text}`;
 
   const student =
     route.student != null ? students.find((s) => s.studentNumber === Number(route.student)) : undefined;
+
+  // Принцип вчительки → скринька методики
+  if (route.action === "methodology") {
+    const idea = (route.journal_text ?? "").trim() || text.trim();
+    await addInbox(source === "VOICE" ? "VOICE" : "TEXT", idea);
+    const reply = `✓ Додала в скриньку методики:\n\n«${idea}»\n\nВбудувати: Налаштування → Моя методика → «Оновити методику».`;
+    await saveAssistantReply(reply, null);
+    await sendLongTelegramMessage(chatId, reply);
+    return;
+  }
 
   // Учень потрібен, але не визначений
   if (
@@ -232,7 +255,7 @@ ${text}`;
             })
             .join("\n");
 
-    const input = `УЧЕНЬ: ${full!.firstName} ${full!.lastName ?? ""}, рівень ${full!.englishLevel}, урок ${full!.defaultLessonDuration} хв
+    const input = `УЧЕНЬ: ${full!.firstName} ${full!.lastName ?? ""}, вік ${ageInfo(full!)}, рівень ${full!.englishLevel}, урок ${full!.defaultLessonDuration} хв
 Загальні нотатки: ${full!.notes || "немає"}
 Наступний урок: ${nextLesson ? kyiv(nextLesson.startAt) : "не заплановано"}
 
@@ -251,7 +274,7 @@ ${historyToText(historyWithoutCurrent)}
 ПОВІДОМЛЕННЯ ВЧИТЕЛЬКИ
 ${text}`;
 
-    const answer = await callClaude(ADVICE_PROMPT, input, 1500);
+    const answer = await callClaude(ADVICE_PROMPT + (await methodContext()), input, 1500);
     if (!answer.ok) {
       await sendTelegramMessage(chatId, `⚠️ ${escapeTelegramHtml(answer.error)}`);
       return;
@@ -309,7 +332,7 @@ ${historyToText(historyWithoutCurrent)}
 
 ПОВІДОМЛЕННЯ ВЧИТЕЛЬКИ
 ${text}`;
-  const answer = await callClaude(CHAT_PROMPT, input, 1200);
+  const answer = await callClaude(CHAT_PROMPT + (await methodContext()), input, 1200);
   if (!answer.ok) {
     await sendTelegramMessage(chatId, `⚠️ ${escapeTelegramHtml(answer.error)}`);
     return;

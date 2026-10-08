@@ -43,6 +43,8 @@ export async function PUT(
       telegramUsername: body.telegramUsername || null,
       contactChannel: body.contactChannel === "VIBER" ? "VIBER" : "TELEGRAM",
       viberPhone: body.viberPhone || null,
+      birthYear: Number(body.birthYear) >= 1920 && Number(body.birthYear) <= new Date().getFullYear() ? Number(body.birthYear) : null,
+      isAdult: Boolean(body.isAdult),
       englishLevel: body.englishLevel,
       lessonFormat: body.lessonFormat,
       defaultLessonDuration: Number(body.defaultLessonDuration) || 60,
