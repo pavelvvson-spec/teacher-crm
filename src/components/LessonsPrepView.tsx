@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatTime } from "@/lib/calendar-utils";
 import CopyPrepButton from "@/components/CopyPrepButton";
+import AiPrepButton from "@/components/AiPrepButton";
 
 type Material = {
   id: string;
@@ -275,6 +276,12 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
             </div>
 
             <CopyPrepButton lessonId={openLesson_.id} onCopied={handleCopied} />
+
+            <AiPrepButton
+              lessonId={openLesson_.id}
+              onUsePlan={(text) => setNoteText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
+              onUseHomework={(text) => setHomeworkText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
+            />
 
             <div className="border-b border-gray-100 pb-4 space-y-2">
               <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>
