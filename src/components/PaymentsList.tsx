@@ -10,7 +10,9 @@ export type PaymentKind = "perLesson" | "periodic" | "prepaid" | "other";
 export type PaymentRow = {
   id: string;
   fullName: string;
-  balance: number; // > 0 борг, < 0 передоплата, 0 усе оплачено
+  balance: number; // > 0 винен, < 0 передоплата, 0 усе оплачено
+  overdue: number; // борг: термін оплати вже минув
+  upcoming: number; // до сплати за графіком (кінець тижня/місяця ще не настав)
   kind: PaymentKind;
   lessonsLeft: number | null; // лише для «Передоплата на місяць»
   unpaidLessons: { id: string; date: string; time: string; amount: number }[];
@@ -45,8 +47,23 @@ function lessonsWord(n: number): string {
 }
 
 function Amount({ row }: { row: PaymentRow }) {
-  if (row.balance > 0) {
-    return <p className="font-semibold text-red-600 whitespace-nowrap">Борг {money(row.balance)}</p>;
+  if (row.overdue > 0) {
+    return (
+      <div className="text-right">
+        <p className="font-semibold text-red-600 whitespace-nowrap">Борг {money(row.overdue)}</p>
+        {row.upcoming > 0 && (
+          <p className="text-xs text-amber-600 whitespace-nowrap">+ {money(row.upcoming)} до сплати</p>
+        )}
+      </div>
+    );
+  }
+  if (row.upcoming > 0) {
+    return (
+      <div className="text-right">
+        <p className="font-semibold text-amber-600 whitespace-nowrap">До сплати {money(row.upcoming)}</p>
+        <p className="text-xs text-gray-400">за графіком</p>
+      </div>
+    );
   }
   if (row.balance < 0) {
     return (
@@ -134,7 +151,10 @@ export default function PaymentsList({ rows }: { rows: PaymentRow[] }) {
     );
   }, [rows, tab, query]);
 
-  const debtors = visible.filter((r) => r.balance > 0).sort((a, b) => b.balance - a.balance);
+  const debtors = visible.filter((r) => r.overdue > 0).sort((a, b) => b.overdue - a.overdue);
+  const upcoming = visible
+    .filter((r) => r.overdue <= 0 && r.upcoming > 0)
+    .sort((a, b) => b.upcoming - a.upcoming);
   const prepaid = visible.filter((r) => r.balance < 0).sort((a, b) => a.balance - b.balance);
   const paid = visible.filter((r) => r.balance === 0);
   const showKind = tab === "all";
@@ -173,6 +193,7 @@ export default function PaymentsList({ rows }: { rows: PaymentRow[] }) {
       ) : (
         <>
           <Group title="Боргують" dot="bg-red-500" rows={debtors} showKind={showKind} />
+          <Group title="До сплати за графіком" dot="bg-amber-400" rows={upcoming} showKind={showKind} />
           <Group title="Передоплата" dot="bg-violet-500" rows={prepaid} showKind={showKind} />
           <Group title="Усе оплачено" dot="bg-green-500" rows={paid} showKind={showKind} />
         </>

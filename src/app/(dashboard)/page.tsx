@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import CheerBanner from "@/components/CheerBanner";
 import ConfettiCelebration from "@/components/ConfettiCelebration";
+import InfoTip from "@/components/InfoTip";
 import AutoRefresh from "@/components/AutoRefresh";
 import BirthdayCard, { type BirthdayPerson } from "@/components/BirthdayCard";
 import { ageYears } from "@/lib/pedagogy";
@@ -127,7 +128,7 @@ export default async function HomePage() {
       startAt: { gte: startOfMonth, lte: endOfMonth },
       status: { in: ["SCHEDULED", "COMPLETED", "RESCHEDULED"] },
     },
-    select: { price: true, duration: true },
+    select: { price: true, duration: true, status: true },
   });
 
   const monthForecast = monthLessons.reduce(
@@ -135,6 +136,10 @@ export default async function HomePage() {
     0
   );
 
+  // Скільки з прогнозу вже відпрацьовано (проведені уроки місяця)
+  const monthEarned = monthLessons
+    .filter((l: typeof monthLessons[number]) => l.status === "COMPLETED")
+    .reduce((sum: number, l: typeof monthLessons[number]) => sum + l.price, 0);
   const monthMinutes = monthLessons.reduce(
     (sum: number, l: typeof monthLessons[number]) => sum + l.duration,
     0
@@ -158,16 +163,25 @@ export default async function HomePage() {
           </p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
-          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight">
+          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight flex items-center gap-1">
             <span className="sm:hidden">{allDone ? "Заробила" : "Заробиш"}</span>
             <span className="hidden sm:inline">{allDone ? "Заробила сьогодні" : "Заробиш сьогодні"}</span>
+            <InfoTip
+              title={allDone ? "Заробила сьогодні" : "Заробиш сьогодні"}
+              text="Сума цін усіх сьогоднішніх уроків за календарем. Це вартість роботи за день, а не гроші, що вже прийшли — оплати видно у «Фінансах»."
+            />
           </p>
           <p className="text-base sm:text-2xl font-semibold text-green-600 mt-1 sm:mt-0">{todayIncome} грн</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
-          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight">
+          <p className="text-[11px] sm:text-sm text-gray-500 leading-tight flex items-center gap-1">
             <span className="sm:hidden">Прогноз</span>
             <span className="hidden sm:inline">Прогноз на місяць</span>
+            <InfoTip
+              align="right"
+              title="Прогноз на місяць"
+              text="Скільки коштують усі уроки цього місяця в календарі — і вже проведені, і ще заплановані. Скасовані не рахуються. Простими словами — скільки можна заробити за місяць, якщо всі уроки відбудуться. «Зароблено» — це вже проведені уроки з цього прогнозу."
+            />
           </p>
           <p className="text-base sm:text-2xl font-semibold text-pink-600 mt-1 sm:mt-0">{monthForecast} грн</p>
           <p className="text-[10px] sm:text-xs text-gray-400 mt-1 leading-tight">
@@ -177,6 +191,10 @@ export default async function HomePage() {
           <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 leading-tight">
             ≈ {formatHours(monthMinutes)}
             <span className="hidden sm:inline"> роботи</span>
+          </p>
+          <p className="text-[10px] sm:text-xs text-green-600 mt-0.5 leading-tight">
+            <span className="sm:hidden">зароб. {monthEarned}</span>
+            <span className="hidden sm:inline">зароблено вже {monthEarned} грн</span>
           </p>
         </div>
       </div>

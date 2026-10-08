@@ -11,27 +11,28 @@ const NAV_ITEMS = [
   { href: "/calendar", label: "Календар" },
   { href: "/students", label: "Учні" },
   { href: "/lessons", label: "Підготовка до уроку" },
-  { href: "/payments", label: "Оплати" },
-  { href: "/reports", label: "Звіти" },
+  { href: "/payments", label: "Фінанси" },
   { href: "/settings/telegram", label: "Налаштування" },
 ];
+
+// «Фінанси» мають дві вкладки: /payments (Учні) і /reports (Підсумки)
+const FINANCE_PATHS = ["/payments", "/reports"];
 
 // Нижня панель на телефоні: 4 головні сторінки + «Ще»
 const BOTTOM_MAIN = [
   { href: "/", label: "Головна" },
   { href: "/calendar", label: "Календар" },
   { href: "/students", label: "Учні" },
-  { href: "/payments", label: "Оплати" },
+  { href: "/payments", label: "Фінанси" },
 ];
 
 const BOTTOM_MORE = [
   { href: "/lessons", label: "Підготовка до уроку" },
-  { href: "/reports", label: "Звіти" },
   { href: "/settings/telegram", label: "Налаштування" },
 ];
 
 // Сторінки першого рівня: на них кнопка «Назад» не потрібна
-const TOP_LEVEL_PATHS = NAV_ITEMS.map((item) => item.href);
+const TOP_LEVEL_PATHS = [...NAV_ITEMS.map((item) => item.href), "/reports"];
 
 function NavIcon({ href }: { href: string }) {
   const common = {
@@ -95,7 +96,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   function isActive(href: string) {
-    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+    if (href === "/") return pathname === "/";
+    if (href === "/payments") return FINANCE_PATHS.some((p) => pathname.startsWith(p));
+    return pathname.startsWith(href);
   }
 
   const moreActive = BOTTOM_MORE.some((item) => isActive(item.href));

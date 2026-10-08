@@ -1,28 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { paymentMethodLabel, allocatePayments } from "@/lib/payments-utils";
+import { allocatePayments } from "@/lib/payments-utils";
+import FinanceTabs from "@/components/FinanceTabs";
+import InfoTip from "@/components/InfoTip";
+import Link from "next/link";
 import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 
 export const dynamic = "force-dynamic";
-
-function formatLessonDateTimeKyiv(date: Date): string {
-  return new Intl.DateTimeFormat("uk-UA", {
-    timeZone: "Europe/Kyiv",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatDateKyiv(date: Date): string {
-  return new Intl.DateTimeFormat("uk-UA", {
-    timeZone: "Europe/Kyiv",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(date);
-}
 
 type Ymd = { y: number; m: number; d: number }; // m: 0..11
 
@@ -57,11 +40,6 @@ function ymdToString(v: Ymd): string {
   return `${v.y}-${String(v.m + 1).padStart(2, "0")}-${String(v.d).padStart(2, "0")}`;
 }
 
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  UNPAID: "Не оплачено",
-  DEBT: "Борг",
-  PARTIALLY_PAID: "Частково оплачено",
-};
 
 export default async function ReportsPage({
   searchParams,
@@ -72,16 +50,29 @@ export default async function ReportsPage({
 
   // Період за київським часом: за замовчуванням поточний місяць
   const today = kyivToday();
-  const defaultFromYmd: Ymd = { y: today.y, m: today.m, d: 1 };
-  const defaultToYmd: Ymd = normalizeYmd(today.y, today.m + 1, 0); // останній день місяця
+  const thisMonthFrom: Ymd = { y: today.y, m: today.m, d: 1 };
+  const thisMonthTo: Ymd = normalizeYmd(today.y, today.m + 1, 0);
+  const lastMonthFrom: Ymd = normalizeYmd(today.y, today.m - 1, 1);
+  const lastMonthTo: Ymd = normalizeYmd(today.y, today.m, 0);
+  const yearFrom: Ymd = { y: today.y, m: 0, d: 1 };
+  const yearTo: Ymd = { y: today.y, m: 11, d: 31 };
 
-  const fromYmd = parseYmd(params.from) ?? defaultFromYmd;
-  const toYmd = parseYmd(params.to) ?? defaultToYmd;
+  const fromYmd = parseYmd(params.from) ?? thisMonthFrom;
+  const toYmd = parseYmd(params.to) ?? thisMonthTo;
   const dayAfterTo = normalizeYmd(toYmd.y, toYmd.m, toYmd.d + 1);
 
   // from: початок першого дня; to: початок дня ПІСЛЯ останнього (не включно)
   const from = kyivWallTimeToUtc(fromYmd.y, fromYmd.m, fromYmd.d, 0, 0);
   const to = kyivWallTimeToUtc(dayAfterTo.y, dayAfterTo.m, dayAfterTo.d, 0, 0);
+
+  const fromStr = ymdToString(fromYmd);
+  const toStr = ymdToString(toYmd);
+  const presets = [
+    { label: "Цей місяць", from: ymdToString(thisMonthFrom), to: ymdToString(thisMonthTo) },
+    { label: "Минулий місяць", from: ymdToString(lastMonthFrom), to: ymdToString(lastMonthTo) },
+    { label: "Цей рік", from: ymdToString(yearFrom), to: ymdToString(yearTo) },
+  ];
+  const activePreset = presets.find((p) => p.from === fromStr && p.to === toStr);
 
   // Скільки кожного неоплаченого уроку вже закрито оплатами (найстаріші уроки закриваються першими)
   const allStudents = await prisma.student.findMany({
@@ -107,6 +98,7 @@ export default async function ReportsPage({
     return lesson.price;
   }
 
+  // ЗАРОБЛЕНО: проведені уроки за період (ціна), незалежно від оплати
   const lessons = await prisma.lesson.findMany({
     where: {
       startAt: { gte: from, lt: to },
@@ -114,20 +106,29 @@ export default async function ReportsPage({
     },
     include: { student: true },
   });
+  const earned = lessons.reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
+  const minutes = lessons.reduce((sum: number, l: typeof lessons[number]) => sum + l.duration, 0);
 
-  const totalAmount = lessons.reduce((sum: number, l: typeof lessons[number]) => sum + l.price, 0);
+  // ПЛАН: усі проведені й заплановані уроки періоду (як «Прогноз» на головній)
+  const planLessons = await prisma.lesson.findMany({
+    where: {
+      startAt: { gte: from, lt: to },
+      status: { in: ["SCHEDULED", "COMPLETED", "RESCHEDULED"] },
+    },
+    select: { price: true },
+  });
+  const plan = planLessons.reduce((sum: number, l: typeof planLessons[number]) => sum + l.price, 0);
+  const planPercent = plan > 0 ? Math.min(100, Math.round((earned / plan) * 100)) : 0;
 
-  // Уроки, позначені оплаченими, і окремі оплати за період
+  // ОТРИМАНО: уроки, позначені оплаченими (старі записи), і окремі оплати за датою оплати
   const paidFlagLessons = await prisma.lesson.findMany({
     where: { startAt: { gte: from, lt: to }, paymentStatus: "PAID" },
     include: { student: true },
-    orderBy: { startAt: "asc" },
   });
   const paidFlagTotal = paidFlagLessons.reduce(
     (sum: number, l: typeof paidFlagLessons[number]) => sum + l.price,
     0
   );
-
   const periodPayments = await prisma.payment.findMany({
     where: {
       status: "PAID",
@@ -138,321 +139,181 @@ export default async function ReportsPage({
     },
     include: { student: true },
   });
-  const sortedPayments = periodPayments.sort(
-    (a: typeof periodPayments[number], b: typeof periodPayments[number]) =>
-      (b.paidAt ?? b.createdAt).getTime() - (a.paidAt ?? a.createdAt).getTime()
-  );
-  const paymentsTotal = sortedPayments.reduce(
-    (sum: number, p: typeof sortedPayments[number]) => sum + p.amount,
+  const paymentsTotal = periodPayments.reduce(
+    (sum: number, p: typeof periodPayments[number]) => sum + p.amount,
     0
   );
+  const received = paidFlagTotal + paymentsTotal;
 
-  const paidAmount = paidFlagTotal + paymentsTotal;
-
-  // Зведення по учнях: скільки кожен учень сплатив за період (окремі оплати + позначені уроки)
-  const perStudentMap = new Map<string, { name: string; payments: number; flagged: number }>();
-  for (const p of sortedPayments) {
-    const name = `${p.student.firstName} ${p.student.lastName ?? ""}`.trim();
-    const entry = perStudentMap.get(p.studentId) ?? { name, payments: 0, flagged: 0 };
-    entry.payments += p.amount;
-    perStudentMap.set(p.studentId, entry);
-  }
-  for (const l of paidFlagLessons) {
-    const name = `${l.student.firstName} ${l.student.lastName ?? ""}`.trim();
-    const entry = perStudentMap.get(l.studentId) ?? { name, payments: 0, flagged: 0 };
-    entry.flagged += l.price;
-    perStudentMap.set(l.studentId, entry);
-  }
-  const perStudent = Array.from(perStudentMap.values())
-    .map((x) => ({ ...x, total: x.payments + x.flagged }))
-    .sort((a, b) => b.total - a.total);
-
-  // Уроки передоплатників не вважаємо "неоплаченими" — гроші за них уже внесені наперед,
-  // просто не прив'язані до конкретного уроку.
-  const unpaidAmount = lessons
+  // Розбивка отриманого: за уроки цього періоду і все інше (наперед або за попередні уроки)
+  const unpaidForPeriod = lessons
     .filter(
       (l: typeof lessons[number]) =>
         l.paymentStatus !== "PAID" && l.student.paymentFrequency !== "MONTHLY_PREPAID"
     )
     .reduce((sum: number, l: typeof lessons[number]) => sum + owedFor(l), 0);
+  const receivedForPeriodLessons = Math.min(received, Math.max(0, earned - unpaidForPeriod));
+  const receivedOther = Math.max(0, received - receivedForPeriodLessons);
 
-  // Розділення грошей, що надійшли: за уроки цього періоду і все інше
-  // (передоплати за майбутні уроки та оплати за уроки з інших періодів)
-  const paidForPeriodLessons = Math.max(0, totalAmount - unpaidAmount);
-  const paidOther = paidAmount - paidForPeriodLessons;
-
-  const debtorsMap = new Map<string, { name: string; amount: number }>();
-  for (const lesson of lessons) {
-    if (lesson.student.paymentFrequency === "MONTHLY_PREPAID") continue;
-    if (lesson.paymentStatus === "UNPAID" || lesson.paymentStatus === "DEBT") {
-      const owed = owedFor(lesson);
-      if (owed <= 0) continue;
-      const key = lesson.studentId;
-      const existing = debtorsMap.get(key);
-      const name = `${lesson.student.firstName} ${lesson.student.lastName ?? ""}`.trim();
-      if (existing) {
-        existing.amount += owed;
-      } else {
-        debtorsMap.set(key, { name, amount: owed });
-      }
-    }
+  // Хто скільки приніс за період
+  const perStudentMap = new Map<string, { id: string; name: string; total: number }>();
+  for (const p of periodPayments) {
+    const name = `${p.student.firstName} ${p.student.lastName ?? ""}`.trim();
+    const entry = perStudentMap.get(p.studentId) ?? { id: p.studentId, name, total: 0 };
+    entry.total += p.amount;
+    perStudentMap.set(p.studentId, entry);
   }
-  const debtors = Array.from(debtorsMap.values());
+  for (const l of paidFlagLessons) {
+    const name = `${l.student.firstName} ${l.student.lastName ?? ""}`.trim();
+    const entry = perStudentMap.get(l.studentId) ?? { id: l.studentId, name, total: 0 };
+    entry.total += l.price;
+    perStudentMap.set(l.studentId, entry);
+  }
+  const perStudent = Array.from(perStudentMap.values()).sort((a, b) => b.total - a.total);
+  const maxPerStudent = perStudent[0]?.total ?? 0;
 
-  const fromStr = ymdToString(fromYmd);
-  const toStr = ymdToString(toYmd);
-
-  const unpaidCandidates = await prisma.lesson.findMany({
-    where: {
-      status: "COMPLETED",
-      paymentStatus: { in: ["UNPAID", "DEBT", "PARTIALLY_PAID"] },
-      student: { paymentFrequency: { not: "MONTHLY_PREPAID" } },
-    },
-    include: { student: true },
-    orderBy: { startAt: "asc" },
-  });
-  // Показуємо тільки те, що ще не покрито оплатами
-  const allUnpaidLessons = unpaidCandidates.filter(
-    (l: typeof unpaidCandidates[number]) => owedFor(l) > 0
-  );
-  const allUnpaidTotal = allUnpaidLessons.reduce(
-    (sum: number, l: typeof allUnpaidLessons[number]) => sum + owedFor(l),
-    0
-  );
+  const uah = (n: number) => `${Math.round(n).toLocaleString("uk-UA")} грн`;
+  const hours = Math.round((minutes / 60) * 10) / 10;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-800">Звіти</h1>
+    <div className="space-y-5">
+      <FinanceTabs active="summary" />
 
-      <form className="bg-white rounded-2xl shadow-sm p-5 flex flex-wrap items-end gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Від</label>
-          <input
-            type="date"
-            name="from"
-            defaultValue={fromStr}
-            className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">До</label>
-          <input
-            type="date"
-            name="to"
-            defaultValue={toStr}
-            className="px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <button
-          type="submit"
-          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
-        >
-          Показати
-        </button>
-      </form>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-sm text-gray-500">Проведено уроків</p>
-          <p className="text-xl font-semibold text-gray-800">{lessons.length}</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-sm text-gray-500">Заробіток за проведені уроки</p>
-          <p className="text-xl font-semibold text-gray-800">{totalAmount} грн</p>
-        </div>
-
-        <details className="bg-white rounded-2xl shadow-sm p-4 open:col-span-2 sm:open:col-span-4">
-          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-            <p className="text-sm text-gray-500">
-              Надійшло грошей <span className="text-xs text-pink-600">(натисни, щоб побачити хто)</span>
-            </p>
-            <p className="text-xl font-semibold text-green-600">{paidAmount} грн</p>
-            <div className="mt-1 text-xs text-gray-600 space-y-0.5">
-              <p>
-                за уроки цього періоду: <span className="font-semibold">{paidForPeriodLessons} грн</span>
-              </p>
-              <p>
-                {paidOther >= 0
-                  ? "передоплати наперед і оплати за інші періоди: "
-                  : "оплачено раніше, у інших періодах: "}
-                <span className="font-semibold">{Math.abs(paidOther)} грн</span>
-              </p>
-            </div>
+      {/* Період */}
+      <div className="flex flex-wrap items-center gap-2">
+        {presets.map((p) => (
+          <Link
+            key={p.label}
+            href={`/reports?from=${p.from}&to=${p.to}`}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+              activePreset?.label === p.label
+                ? "bg-pink-600 text-white"
+                : "bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+            }`}
+          >
+            {p.label}
+          </Link>
+        ))}
+        <details open={!activePreset}>
+          <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer px-3 py-1.5 rounded-lg text-sm font-medium bg-white text-gray-700 shadow-sm hover:bg-gray-50">
+            Свої дати
           </summary>
-
-          <div className="mt-4 space-y-5">
-            <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
-              <p>
-                «Заробіток» це вартість проведених уроків ({totalAmount} грн). «Надійшло» це гроші, які
-                реально внесли за період, разом з передоплатами за майбутні уроки.
-              </p>
-              <p>
-                Розділення по грошах рахується так: заробіток мінус неоплачене ({unpaidAmount} грн) =
-                оплачено за уроки періоду ({paidForPeriodLessons} грн). Решта це передоплата або оплата за
-                інші періоди.
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-800 mb-1">Зведення по учнях</p>
-              <p className="text-xs text-gray-500 mb-2">
-                Скільки кожен учень сплатив за період: окремі оплати плюс уроки, позначені оплаченими. Зручно
-                звіряти зі своїми записами.
-              </p>
-              {perStudent.length === 0 ? (
-                <p className="text-sm text-gray-500">За цей період надходжень немає.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {perStudent.map((s) => (
-                    <div key={s.name} className="flex items-center justify-between py-2 gap-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {s.payments > 0 && `окремі оплати ${s.payments} грн`}
-                          {s.payments > 0 && s.flagged > 0 && " + "}
-                          {s.flagged > 0 && `позначені уроки ${s.flagged} грн`}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-green-600">{s.total} грн</p>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between py-2 gap-2">
-                    <p className="text-sm font-semibold text-gray-800">Разом</p>
-                    <p className="text-sm font-bold text-green-700">{paidAmount} грн</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-800 mb-1">
-                Окремі оплати ({sortedPayments.length} шт, {paymentsTotal} грн)
-              </p>
-              <p className="text-xs text-gray-500 mb-2">
-                Дата це день, коли гроші надійшли.
-              </p>
-              {sortedPayments.length === 0 ? (
-                <p className="text-sm text-gray-500">За цей період окремих оплат немає.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {sortedPayments.map((p: typeof sortedPayments[number]) => (
-                    <div key={p.id} className="flex items-center justify-between py-2 gap-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {p.student.firstName} {p.student.lastName ?? ""}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatDateKyiv(p.paidAt ?? p.createdAt)} · {paymentMethodLabel(p.paymentMethod)}
-                          {p.comment ? ` · ${p.comment}` : ""}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-green-600">{p.amount} грн</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-800 mb-1">
-                Уроки, позначені оплаченими ({paidFlagLessons.length} шт, {paidFlagTotal} грн)
-              </p>
-              <p className="text-xs text-gray-500 mb-2">
-                Для них дата оплати не зберігається, тому показана дата уроку.
-              </p>
-              {paidFlagLessons.length === 0 ? (
-                <p className="text-sm text-gray-500">За цей період таких уроків немає.</p>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {paidFlagLessons.map((l: typeof paidFlagLessons[number]) => (
-                    <div key={l.id} className="flex items-center justify-between py-2 gap-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {l.student.firstName} {l.student.lastName ?? ""}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          урок {formatLessonDateTimeKyiv(l.startAt)}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-green-600">{l.price} грн</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <form className="mt-2 bg-white rounded-2xl shadow-sm p-3 flex flex-wrap items-end gap-2">
+            <label className="text-xs text-gray-500">
+              Від
+              <input
+                type="date"
+                name="from"
+                defaultValue={fromStr}
+                className="block mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800"
+              />
+            </label>
+            <label className="text-xs text-gray-500">
+              До
+              <input
+                type="date"
+                name="to"
+                defaultValue={toStr}
+                className="block mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800"
+              />
+            </label>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700"
+            >
+              Показати
+            </button>
+          </form>
         </details>
-
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-sm text-gray-500">Не оплачено</p>
-          <p className="text-xl font-semibold text-red-600">{unpaidAmount} грн</p>
-        </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">Список боржників за період</h2>
-        {debtors.length === 0 ? (
-          <p className="text-gray-500">Боржників за цей період немає.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {debtors.map((d, i) => (
-              <div key={i} className="flex items-center justify-between py-3">
-                <p className="font-medium text-gray-800">{d.name}</p>
-                <p className="font-semibold text-red-600">{d.amount} грн</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <details className="bg-white rounded-2xl shadow-sm p-5">
-        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">Неоплачені уроки (за весь час)</h2>
-              <p className="text-xs text-pink-600">
-                {allUnpaidLessons.length === 0
-                  ? "усе оплачено"
-                  : `${allUnpaidLessons.length} ур., ${allUnpaidTotal} грн · натисни, щоб розкрити`}
-              </p>
-            </div>
-            {allUnpaidLessons.length > 0 && (
-              <p className="font-semibold text-red-600">{allUnpaidTotal} грн</p>
-            )}
-          </div>
-        </summary>
-
-        <div className="mt-4">
-          <p className="text-sm text-gray-500 mb-3">
-            Уроки, які ще не закриті оплатами, для звірки, незалежно від обраного періоду вище. Оплати
-            закривають найстаріші уроки першими.
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 mb-1 flex items-center gap-1">
+            Отримано
+            <InfoTip
+              title="Отримано"
+              text="Усі гроші, які учні реально заплатили за цей період (за датою оплати). Сюди входять і оплати наперед, і доплати за минулі уроки. Простими словами — скільки грошей прийшло в кишеню."
+            />
           </p>
-          {allUnpaidLessons.length === 0 ? (
-            <p className="text-gray-500">Неоплачених уроків немає — усе оплачено.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {allUnpaidLessons.map((lesson: typeof allUnpaidLessons[number]) => {
-                const owed = owedFor(lesson);
-                return (
-                  <div key={lesson.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {lesson.student.firstName} {lesson.student.lastName ?? ""}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formatLessonDateTimeKyiv(lesson.startAt)} ·{" "}
-                        {PAYMENT_STATUS_LABELS[lesson.paymentStatus] ?? lesson.paymentStatus}
-                        {owed < lesson.price && ` · частково покрито оплатою (урок ${lesson.price} грн)`}
-                      </p>
-                    </div>
-                    <p className="font-semibold text-red-600">{owed} грн</p>
-                  </div>
-                );
-              })}
-            </div>
+          <p className="text-xl sm:text-2xl font-bold text-green-600">{uah(received)}</p>
+          {received > 0 && receivedOther > 0 && (
+            <p className="text-[11px] sm:text-xs text-gray-400 mt-1 leading-snug">
+              {uah(receivedForPeriodLessons)} — за уроки періоду, {uah(receivedOther)} — наперед або за попередні
+            </p>
           )}
         </div>
-      </details>
+
+        <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 mb-1 flex items-center gap-1">
+            Зароблено
+            <InfoTip
+              align="right"
+              title="Зароблено"
+              text="Скільки коштують усі проведені уроки за цей період. Не важливо, заплатили за них уже чи ні — це «скільки роботи зроблено». Урок «не прийшов, але оплачується» теж сюди входить."
+            />
+          </p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-800">{uah(earned)}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 mb-1 flex items-center gap-1">
+            План
+            <InfoTip
+              title="План"
+              text="Скільки коштують усі уроки цього періоду в календарі — і вже проведені, і ще заплановані. Скасовані не рахуються. Смужка показує, яку частину плану вже відпрацьовано (зароблено з плану)."
+            />
+          </p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-800">{uah(plan)}</p>
+          <div className="mt-2 h-1.5 sm:h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full bg-pink-500" style={{ width: `${planPercent}%` }} />
+          </div>
+          <p className="text-[11px] sm:text-xs text-gray-400 mt-1">відпрацьовано {planPercent}%</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
+          <p className="text-xs sm:text-sm text-gray-500 mb-1 flex items-center gap-1">
+            Проведено уроків
+            <InfoTip
+              align="right"
+              title="Проведено уроків"
+              text="Скільки уроків за цей період позначено як «Проведено». Скасовані уроки і «не прийшов, не оплачується» не рахуються."
+            />
+          </p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-800">{lessons.length}</p>
+          <p className="text-[11px] sm:text-xs text-gray-400 mt-1">≈ {hours.toLocaleString("uk-UA")} год роботи</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
+        <h2 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-1.5">
+          Хто скільки заплатив
+          <InfoTip
+            title="Хто скільки заплатив"
+            text="Скільки грошей заплатив кожен учень за цей період. Разом це дорівнює сумі «Отримано»."
+          />
+        </h2>
+        {perStudent.length === 0 ? (
+          <p className="text-gray-500 text-sm">За цей період оплат ще не було.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {perStudent.map((s) => (
+              <li key={s.id} className="py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-gray-800 truncate">{s.name}</span>
+                  <span className="font-semibold text-gray-800 whitespace-nowrap">{uah(s.total)}</span>
+                </div>
+                <div className="mt-1 h-1 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className="h-full bg-green-400"
+                    style={{ width: `${maxPerStudent > 0 ? Math.round((s.total / maxPerStudent) * 100) : 0}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
