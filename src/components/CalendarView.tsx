@@ -15,6 +15,8 @@ import {
 } from "@/lib/calendar-utils";
 import LessonForm from "@/components/LessonForm";
 import CalendarResetMenu from "@/components/CalendarResetMenu";
+import SyncAllSchedulesButton from "@/components/SyncAllSchedulesButton";
+import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
 import CopyPrepButton from "@/components/CopyPrepButton";
 import AiPrepButton from "@/components/AiPrepButton";
 import SendLinkButton from "@/components/SendLinkButton";
@@ -386,43 +388,115 @@ export default function CalendarView({ students }: { students: Student[] }) {
     : null;
   const isPrepaidStudent = selectedStudent?.paymentFrequency === "MONTHLY_PREPAID";
 
+  // Підпис періоду між стрілками і кнопка повернення до поточного періоду
+  const MONTHS_GEN = [
+    "січня", "лютого", "березня", "квітня", "травня", "червня",
+    "липня", "серпня", "вересня", "жовтня", "листопада", "грудня",
+  ];
+  function periodLabel(): string {
+    if (viewMode === "day") {
+      const wd = currentDate.toLocaleDateString("uk-UA", { weekday: "long" });
+      return `${wd}, ${currentDate.getDate()} ${MONTHS_GEN[currentDate.getMonth()]}`;
+    }
+    if (viewMode === "week") {
+      const s = startOfWeek(currentDate);
+      const e = addDays(s, 6);
+      return s.getMonth() === e.getMonth()
+        ? `${s.getDate()}–${e.getDate()} ${MONTHS_GEN[e.getMonth()]}`
+        : `${s.getDate()} ${MONTHS_GEN[s.getMonth()]} – ${e.getDate()} ${MONTHS_GEN[e.getMonth()]}`;
+    }
+    return formatMonthYear(currentDate);
+  }
+  const now = new Date();
+  const isCurrentPeriod =
+    viewMode === "day"
+      ? currentDate.toDateString() === now.toDateString()
+      : viewMode === "week"
+      ? startOfWeek(currentDate).getTime() === startOfWeek(now).getTime()
+      : currentDate.getFullYear() === now.getFullYear() && currentDate.getMonth() === now.getMonth();
+  const backLabel = viewMode === "day" ? "Сьогодні" : viewMode === "week" ? "Цей тиждень" : "Цей місяць";
+
+  // Тиждень: порожні субота/неділя вужчі, щоб буднім дням було більше місця
+  const weekColumns =
+    viewMode === "week"
+      ? days.map((d) => ((d.getDay() === 0 || d.getDay() === 6) && lessonsForDay(d).length === 0 ? "0.5fr" : "1fr")).join(" ")
+      : undefined;
+
+  const LEGEND: { label: string; dot: string }[] = [
+    { label: "заплановано", dot: "bg-pink-400" },
+    { label: "проведено", dot: "bg-green-500" },
+    { label: "перенесено", dot: "bg-yellow-400" },
+    { label: "не з'явився", dot: "bg-red-500" },
+    { label: "скасовано", dot: "bg-gray-300" },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
           {(["day", "week", "month"] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`px-4 py-2 rounded-xl font-medium ${
-                viewMode === mode ? "bg-pink-600 text-white" : "bg-gray-100 text-gray-700"
+              className={`px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium ${
+                viewMode === mode ? "bg-white text-pink-700 shadow-sm" : "text-gray-600 hover:text-gray-800"
               }`}
             >
               {mode === "day" ? "День" : mode === "week" ? "Тиждень" : "Місяць"}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={goToPrevious} className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200">
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={goToPrevious}
+            aria-label="Назад"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100"
+          >
             ←
           </button>
-          <button onClick={goToToday} className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-medium">
-            Сьогодні
-          </button>
-          <button onClick={goToNext} className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200">
+          <span className="min-w-[9.5rem] text-center font-medium text-gray-800 first-letter:uppercase">
+            {periodLabel()}
+          </span>
+          <button
+            onClick={goToNext}
+            aria-label="Вперед"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100"
+          >
             →
           </button>
+          {!isCurrentPeriod && (
+            <button
+              onClick={goToToday}
+              className="ml-1 px-3 py-1.5 rounded-lg text-sm text-pink-700 bg-pink-50 hover:bg-pink-100"
+            >
+              {backLabel}
+            </button>
+          )}
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-5 py-3 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
-        >
-          + Створити урок
-        </button>
-        <CalendarResetMenu onDone={loadLessons} />
+
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-4 py-2.5 bg-pink-600 text-white rounded-xl font-medium hover:bg-pink-700"
+          >
+            + Створити урок
+          </button>
+          <PaymentsMoreMenu>
+            <SyncAllSchedulesButton />
+            <CalendarResetMenu onDone={loadLessons} />
+          </PaymentsMoreMenu>
+        </div>
       </div>
 
-      <p className="text-gray-500 font-medium">{formatMonthYear(currentDate)}</p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+        {LEGEND.map((l) => (
+          <span key={l.label} className="inline-flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${l.dot}`} />
+            {l.label}
+          </span>
+        ))}
+      </div>
 
       {viewMode === "month" && (
         <div className="grid grid-cols-7 gap-1 sm:gap-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wide">
@@ -436,11 +510,12 @@ export default function CalendarView({ students }: { students: Student[] }) {
         <p className="text-gray-400">Завантаження...</p>
       ) : (
         <div
+          style={weekColumns ? ({ "--week-cols": weekColumns } as React.CSSProperties) : undefined}
           className={`grid ${
             viewMode === "day"
               ? "grid-cols-1 gap-3"
               : viewMode === "week"
-              ? "grid-cols-1 sm:grid-cols-7 gap-3"
+              ? "grid-cols-1 sm:[grid-template-columns:var(--week-cols)] gap-3"
               : "grid-cols-7 gap-1 sm:gap-3"
           }`}
         >
@@ -492,20 +567,14 @@ export default function CalendarView({ students }: { students: Student[] }) {
                         }}
                         className={`w-full text-left px-2 py-1 rounded-lg text-xs ${statusColors[lesson.status]}`}
                       >
-                        <p className="font-medium">{formatTime(new Date(lesson.startAt))}</p>
-                        <p className="truncate">
+                        <p className="font-medium flex items-center gap-1">
+                          {formatTime(new Date(lesson.startAt))}
+                          {lesson.teacherNotes && <span title="Є нотатка">📝</span>}
+                          {lesson.homework && <span title="Є ДЗ">📚</span>}
+                        </p>
+                        <p className="truncate" title={`${lesson.student.firstName} ${lesson.student.lastName ?? ""}`}>
                           {lesson.student.firstName} {lesson.student.lastName ?? ""}
                         </p>
-                        {lesson.teacherNotes && (
-                          <p className="truncate italic text-[11px] opacity-80">
-                            📝 {lesson.teacherNotes}
-                          </p>
-                        )}
-                        {lesson.homework && (
-                          <p className="truncate italic text-[11px] opacity-80">
-                            📚 {lesson.homework}
-                          </p>
-                        )}
                       </button>
                     ))}
                   </div>

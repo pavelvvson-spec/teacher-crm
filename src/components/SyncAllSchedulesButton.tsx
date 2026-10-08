@@ -80,7 +80,7 @@ export default function SyncAllSchedulesButton() {
       <button
         type="button"
         onClick={check}
-        className="px-4 py-2 bg-amber-50 text-amber-700 rounded-xl text-sm font-medium hover:bg-amber-100"
+        className="w-full text-left px-3 py-2 text-gray-700 rounded-lg text-sm hover:bg-gray-100"
       >
         Перевірити розклад усіх учнів
       </button>
