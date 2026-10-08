@@ -184,18 +184,6 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadLessons();
   }
 
-  async function sendReminder(lesson: Lesson) {
-    const res = await fetch(`/api/lessons/${lesson.id}/send-reminder`, {
-      method: "POST",
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "Не вдалося надіслати нагадування");
-    } else {
-      alert("Нагадування надіслано!");
-    }
-  }
-
   function startReschedule(lesson: Lesson) {
     const current = new Date(lesson.startAt);
     setRescheduleDate(current.toISOString().slice(0, 10));
@@ -721,12 +709,6 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 </button>
               )}
               <SendLinkButton key={selectedLesson.id} lessonId={selectedLesson.id} />
-              <button
-                onClick={() => sendReminder(selectedLesson)}
-                className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-medium hover:bg-purple-100"
-              >
-                Надіслати нагадування
-              </button>
               <button
                 onClick={() => startReschedule(selectedLesson)}
                 className="px-4 py-2 bg-yellow-50 text-yellow-700 rounded-xl text-sm font-medium hover:bg-yellow-100"
