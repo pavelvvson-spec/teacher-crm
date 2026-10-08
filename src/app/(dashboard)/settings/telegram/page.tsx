@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { isCalendarConfigured, serviceAccountEmail } from "@/lib/google-calendar";
+import CalendarSyncButton from "@/components/CalendarSyncButton";
 
 export const dynamic = "force-dynamic";
 
@@ -75,14 +76,7 @@ export default async function TelegramSettingsPage({
                 Службовий акаунт (йому має бути відкрито доступ до календаря): {saEmail}
               </p>
             )}
-            <form action="/api/google-calendar/sync" method="post">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
-              >
-                Синхронізувати календар зараз
-              </button>
-            </form>
+            <CalendarSyncButton />
           </div>
         ) : (
           <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">Не налаштовано</span>
