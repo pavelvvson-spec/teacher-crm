@@ -18,14 +18,45 @@ export function isFirefliesConfigured() {
   return Boolean(process.env.FIREFLIES_API_KEY);
 }
 
-export function verifyFirefliesSignature(rawBody: string, header: string | null): boolean {
-  const secret = process.env.FIREFLIES_WEBHOOK_SECRET;
-  if (!secret || !header) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const got = header.replace(/^sha256=/, "").trim();
-  const a = Buffer.from(expected, "hex");
-  const b = Buffer.from(got, "hex");
-  return a.length === b.length && timingSafeEqual(a, b);
+function safeEqual(a: string, b: string) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+// Перевірка, що запит справді від Fireflies.
+// Приймаємо підпис HMAC-SHA256 (hex або base64, з префіксом "sha256=" чи без)
+// у будь-якому з відомих заголовків, або секрет у параметрі адреси ?token=...
+export function verifyFirefliesRequest(
+  rawBody: string,
+  headers: Headers,
+  urlToken: string | null
+): { ok: boolean; debug: string } {
+  const secret = process.env.FIREFLIES_WEBHOOK_SECRET?.trim();
+  if (!secret) return { ok: false, debug: "FIREFLIES_WEBHOOK_SECRET не задано у Vercel" };
+
+  if (urlToken && safeEqual(urlToken.trim(), secret)) return { ok: true, debug: "token" };
+
+  const names = ["x-hub-signature", "x-hub-signature-256", "x-fireflies-signature", "x-signature", "signature"];
+  const hmac = createHmac("sha256", secret).update(rawBody);
+  const digest = hmac.digest();
+  const variants = [digest.toString("hex"), digest.toString("base64")];
+
+  const seen: string[] = [];
+  for (const n of names) {
+    const v = headers.get(n);
+    if (!v) continue;
+    seen.push(`${n}(${v.length})`);
+    const got = v.replace(/^sha256=/i, "").trim();
+    if (variants.some((exp) => safeEqual(got.toLowerCase(), exp.toLowerCase()) || safeEqual(got, exp))) {
+      return { ok: true, debug: n };
+    }
+  }
+  const all = Array.from(headers.keys()).join(",");
+  return {
+    ok: false,
+    debug: seen.length ? `підпис не збігся: ${seen.join(", ")}` : `немає заголовка підпису; заголовки: ${all}`,
+  };
 }
 
 async function gql<T>(query: string, variables: Record<string, unknown>): Promise<T> {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { verifyFirefliesSignature, processFirefliesMeeting } from "@/lib/fireflies";
+import { verifyFirefliesRequest, processFirefliesMeeting } from "@/lib/fireflies";
 
 export const maxDuration = 60;
 
@@ -7,7 +7,9 @@ export const maxDuration = 60;
 // Приймаємо лише запити з правильним підписом (FIREFLIES_WEBHOOK_SECRET).
 export async function POST(request: NextRequest) {
   const raw = await request.text();
-  if (!verifyFirefliesSignature(raw, request.headers.get("x-hub-signature"))) {
+  const check = verifyFirefliesRequest(raw, request.headers, request.nextUrl.searchParams.get("token"));
+  if (!check.ok) {
+    console.error("Fireflies webhook rejected:", check.debug);
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
