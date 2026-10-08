@@ -21,6 +21,14 @@ const MARKER_VALUE = "teacher-crm";
 type ServiceAccount = { client_email: string; private_key: string };
 
 function readServiceAccount(): ServiceAccount | null {
+  // Варіант 2: дві окремі змінні (email і private_key), якщо весь JSON не вставляється
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
+  const keyRaw = process.env.GOOGLE_PRIVATE_KEY?.trim();
+  if (email && keyRaw) {
+    const key = keyRaw.replace(/^"+|"+,?$/g, "").replace(/\\n/g, "\n");
+    return { client_email: email, private_key: key };
+  }
+
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) return null;
   try {
