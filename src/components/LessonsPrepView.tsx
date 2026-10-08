@@ -187,9 +187,9 @@ export default function LessonsPrepView({ lessons }: { lessons: Lesson[] }) {
     grouped[dayKey].push(lesson);
   }
 
-  // Урок вважається підготовленим, якщо є нотатка або ДЗ
+  // Урок вважається підготовленим, якщо є нотатка, ДЗ або хоча б один матеріал
   function isPrepared(l: Lesson): boolean {
-    return Boolean(l.teacherNotes?.trim() || l.homework?.trim());
+    return Boolean(l.teacherNotes?.trim() || l.homework?.trim() || l.materials.length > 0);
   }
 
   const openLesson_ = lessonsState.find((l) => l.id === openLessonId) || null;
