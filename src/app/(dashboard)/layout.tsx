@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
+import PullToRefresh from "@/components/PullToRefresh";
 
 const NAV_ITEMS = [
   { href: "/", label: "Головна" },
@@ -136,6 +137,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
       </header>
 
+      <PullToRefresh />
       <main className="max-w-6xl mx-auto px-4 py-6 pb-28 sm:pb-6">
         {showBack && (
           <button
