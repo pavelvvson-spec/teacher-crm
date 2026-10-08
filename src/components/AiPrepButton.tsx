@@ -44,7 +44,7 @@ export default function AiPrepButton({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100"
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
       >
         {open ? "Сховати ШІ-підготовку" : "✨ Підготувати з ШІ"}
       </button>
@@ -79,7 +79,7 @@ export default function AiPrepButton({
                 type="button"
                 onClick={() => {
                   onUsePlan(plan);
-                  setMessage("План вставлено в нотатку. Не забудьте натиснути «Зберегти нотатку».");
+                  setMessage("План вставлено в нотатку. Не забудьте зберегти.");
                 }}
                 className="px-3 py-1.5 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700"
               >
@@ -98,7 +98,7 @@ export default function AiPrepButton({
                 type="button"
                 onClick={() => {
                   onUseHomework(homework);
-                  setMessage("ДЗ вставлено. Не забудьте натиснути «Зберегти домашнє завдання».");
+                  setMessage("ДЗ вставлено. Не забудьте зберегти.");
                 }}
                 className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700"
               >

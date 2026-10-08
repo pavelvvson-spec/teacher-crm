@@ -16,6 +16,29 @@ export default async function LessonsPage() {
     orderBy: { startAt: "asc" },
   });
 
+  // Для блоку «Минулий урок»: недавні уроки цих учнів, де є нотатка або ДЗ
+  const studentIds = [...new Set(lessons.map((l) => l.studentId))];
+  const history = studentIds.length
+    ? await prisma.lesson.findMany({
+        where: {
+          studentId: { in: studentIds },
+          startAt: { gte: new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000), lte: weekAhead },
+          OR: [{ teacherNotes: { not: null } }, { homework: { not: null } }],
+        },
+        select: { id: true, studentId: true, startAt: true, teacherNotes: true, homework: true },
+        orderBy: { startAt: "desc" },
+      })
+    : [];
+
+  function previousFor(lesson: (typeof lessons)[number]) {
+    const prev = history.find(
+      (h) => h.studentId === lesson.studentId && h.id !== lesson.id && h.startAt < lesson.startAt
+    );
+    return prev
+      ? { startAt: prev.startAt.toISOString(), teacherNotes: prev.teacherNotes, homework: prev.homework }
+      : null;
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-800">Підготовка до уроку</h1>
@@ -33,6 +56,7 @@ export default async function LessonsPage() {
             title: m.title,
             url: m.url,
           })),
+          previous: previousFor(l),
         }))}
       />
     </div>

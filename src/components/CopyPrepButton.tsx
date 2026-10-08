@@ -78,7 +78,7 @@ export default function CopyPrepButton({
       <button
         type="button"
         onClick={toggle}
-        className="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100"
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
       >
         {open ? "Сховати список" : "Скопіювати з іншого уроку"}
       </button>
