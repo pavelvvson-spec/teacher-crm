@@ -16,6 +16,7 @@ import {
 import LessonForm from "@/components/LessonForm";
 import CalendarResetMenu from "@/components/CalendarResetMenu";
 import CopyPrepButton from "@/components/CopyPrepButton";
+import AiPrepButton from "@/components/AiPrepButton";
 
 type Student = {
   id: string;
@@ -771,6 +772,12 @@ export default function CalendarView({ students }: { students: Student[] }) {
             </div>
 
             <CopyPrepButton lessonId={selectedLesson.id} onCopied={handleCopied} />
+
+            <AiPrepButton
+              lessonId={selectedLesson.id}
+              onUsePlan={(text) => setNoteText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
+              onUseHomework={(text) => setHomeworkText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
+            />
 
             <div className="border-b border-gray-100 pb-4 space-y-2">
               <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>
