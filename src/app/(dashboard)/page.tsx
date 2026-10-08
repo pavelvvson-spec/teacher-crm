@@ -132,8 +132,8 @@ export default async function HomePage() {
         </div>
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">
           <p className="text-[11px] sm:text-sm text-gray-500 leading-tight">
-            <span className="sm:hidden">Заробиш</span>
-            <span className="hidden sm:inline">Заробиш сьогодні</span>
+            <span className="sm:hidden">{allDone ? "Заробила" : "Заробиш"}</span>
+            <span className="hidden sm:inline">{allDone ? "Заробила сьогодні" : "Заробиш сьогодні"}</span>
           </p>
           <p className="text-base sm:text-2xl font-semibold text-green-600 mt-1 sm:mt-0">{todayIncome} грн</p>
         </div>
