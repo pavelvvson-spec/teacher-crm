@@ -83,7 +83,7 @@ export default async function StudentDetailPage({
           />
         </div>
         <div className="lg:order-1">
-          <StudentForm initialValues={formValues} />
+          <StudentForm initialValues={formValues} telegramConnected={Boolean(student.telegramChatId)} />
         </div>
       </div>
     </div>

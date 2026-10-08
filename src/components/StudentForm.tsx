@@ -51,7 +51,13 @@ const PAYMENT_FREQUENCY_LABELS: Record<string, string> = {
   MONTHLY_PREPAID: "Помісячна (оплата наперед)",
 };
 
-export default function StudentForm({ initialValues }: { initialValues?: Partial<StudentFormValues> }) {
+export default function StudentForm({
+  initialValues,
+  telegramConnected,
+}: {
+  initialValues?: Partial<StudentFormValues>;
+  telegramConnected?: boolean; // чи учень уже натиснув «Start» у боті (лише для картки учня)
+}) {
   const router = useRouter();
   const isEditing = Boolean(initialValues?.id);
 
@@ -169,6 +175,16 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
               autoCapitalize="none"
               className={inputCls}
             />
+            {isEditing &&
+              (telegramConnected ? (
+                <p className="mt-1 text-xs text-green-700">✓ Підключено до бота</p>
+              ) : values.telegramUsername.trim() ? (
+                <p className="mt-1 text-xs text-red-600">
+                  Ще не підключено до бота — попросіть учня знайти бота в Telegram і натиснути «Start»
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">Вкажіть username, щоб учень міг підключитися до бота</p>
+              ))}
           </div>
           <div>
             <label className={labelCls}>Куди надсилати посилання на урок</label>

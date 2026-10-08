@@ -10,7 +10,7 @@ export default function CalendarSyncButton() {
       <button
         type="submit"
         disabled={loading}
-        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
+        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-60"
       >
         {loading ? "⏳ Синхронізую… (до хвилини, не закривайте сторінку)" : "Синхронізувати календар зараз"}
       </button>
