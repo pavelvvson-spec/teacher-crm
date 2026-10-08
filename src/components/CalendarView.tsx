@@ -129,6 +129,35 @@ export default function CalendarView({ students }: { students: Student[] }) {
     setCurrentDate(new Date());
   }
 
+  // Закриття вікон: хрестик, клік поза вікном, Esc
+  function closeLesson() {
+    setSelectedLesson(null);
+    setReschedulingLesson(null);
+    setAskNoShowFor(null);
+  }
+
+  function closePrep() {
+    if (selectedLesson) {
+      const dirty =
+        noteText !== (selectedLesson.teacherNotes || "") || homeworkText !== (selectedLesson.homework || "");
+      if (dirty && !confirm("Нотатку або ДЗ не збережено. Закрити без збереження?")) return;
+    }
+    setShowMaterials(false);
+    setSelectedLesson(null);
+  }
+
+  useEffect(() => {
+    if (!selectedLesson && !showForm) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (showForm) setShowForm(false);
+      else if (showMaterials) closePrep();
+      else closeLesson();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
+
   async function updateLessonFields(lesson: Lesson, fields: Record<string, string>) {
     const res = await fetch(`/api/lessons/${lesson.id}`, {
       method: "PUT",
@@ -586,7 +615,12 @@ export default function CalendarView({ students }: { students: Student[] }) {
         </div>
       )}
       {showForm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setShowForm(false);
+          }}
+        >
           <div className="bg-gray-50 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-semibold text-gray-800">Новий урок</h2>
@@ -617,52 +651,156 @@ export default function CalendarView({ students }: { students: Student[] }) {
       )}
 
       {selectedLesson && !showMaterials && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {selectedLesson.student.firstName} {selectedLesson.student.lastName ?? ""}
-                </h2>
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeLesson();
+          }}
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-xl">
+            {/* Шапка: ім'я (посилання на картку), дата, статус */}
+            <div className="flex justify-between items-start gap-3">
+              <div className="min-w-0">
+                <Link
+                  href={`/students/${selectedLesson.studentId}`}
+                  className="text-lg font-semibold text-gray-800 hover:text-pink-700 truncate block"
+                  title="Відкрити картку учня"
+                >
+                  {selectedLesson.student.firstName} {selectedLesson.student.lastName ?? ""} ›
+                </Link>
                 <p className="text-gray-500 text-sm">
-                  {new Date(selectedLesson.startAt).toLocaleDateString("uk-UA")}{" "}
-                  {formatTime(new Date(selectedLesson.startAt))} · {selectedLesson.duration} хв
+                  {new Date(selectedLesson.startAt).toLocaleDateString("uk-UA", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "long",
+                  })}{" "}
+                  · {formatTime(new Date(selectedLesson.startAt))} · {selectedLesson.duration} хв
                 </p>
+                <span
+                  className={`inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-md ${
+                    statusColors[selectedLesson.status] ?? "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {LESSON_STATUS_LABELS[selectedLesson.status]}
+                </span>
               </div>
               <button
-                onClick={() => {
-                  setSelectedLesson(null);
-                  setReschedulingLesson(null);
-                  setAskNoShowFor(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
+                type="button"
+                onClick={closeLesson}
+                aria-label="Закрити"
+                title="Закрити"
+                className="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 text-xl leading-none"
               >
-                Закрити
+                ×
               </button>
             </div>
 
-            <p className="text-sm">
-              Статус: <span className="font-medium">{LESSON_STATUS_LABELS[selectedLesson.status]}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Оплата:{" "}
-              <span className="font-medium">
-                {isPrepaidStudent
-                  ? "з передоплати за місяць"
-                  : selectedLesson.paymentStatus === "PAID"
-                  ? "оплачено (стара позначка)"
-                  : "дивись у розділі «Оплати»"}
-              </span>
-            </p>
-            {selectedLesson.teacherNotes && (
-              <p className="text-sm bg-pink-50 text-pink-700 rounded-lg px-3 py-2">
-                📝 {selectedLesson.teacherNotes}
-              </p>
+            {isPrepaidStudent && (
+              <p className="text-xs text-gray-500">Оплата: з передоплати за місяць</p>
             )}
-            {selectedLesson.homework && (
-              <p className="text-sm bg-purple-50 text-purple-700 rounded-lg px-3 py-2">
-                📚 ДЗ: {selectedLesson.homework}
-              </p>
+
+            {(selectedLesson.teacherNotes || selectedLesson.homework) && (
+              <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm space-y-1">
+                {selectedLesson.teacherNotes && (
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    <span className="text-gray-400">Нотатка:</span> {selectedLesson.teacherNotes}
+                  </p>
+                )}
+                {selectedLesson.homework && (
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    <span className="text-gray-400">ДЗ:</span> {selectedLesson.homework}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Як пройшов урок */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Як пройшов урок?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleStatus(selectedLesson, "COMPLETED")}
+                  className={`px-3 py-3 rounded-xl text-sm font-medium border-2 ${
+                    selectedLesson.status === "COMPLETED"
+                      ? "bg-green-600 text-white border-green-600"
+                      : "bg-white text-green-700 border-green-200 hover:bg-green-50"
+                  }`}
+                >
+                  ✓ Проведено
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedLesson.status === "NO_SHOW") {
+                      toggleStatus(selectedLesson, "NO_SHOW");
+                    } else {
+                      setAskNoShowFor(selectedLesson.id);
+                    }
+                  }}
+                  className={`px-3 py-3 rounded-xl text-sm font-medium border-2 ${
+                    selectedLesson.status === "NO_SHOW"
+                      ? "bg-red-600 text-white border-red-600"
+                      : "bg-white text-red-700 border-red-200 hover:bg-red-50"
+                  }`}
+                >
+                  Не прийшов
+                </button>
+              </div>
+
+              {askNoShowFor === selectedLesson.id && (
+                <div className="bg-red-50 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-medium text-gray-700">
+                    Учень не прийшов. Цей урок оплачується?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => markNoShow(selectedLesson, true)}
+                      className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                    >
+                      Так, оплачується
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => markNoShow(selectedLesson, false)}
+                      className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                    >
+                      Ні, не оплачується
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAskNoShowFor(null)}
+                      className="px-4 py-2.5 bg-white text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100"
+                    >
+                      Назад
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Головні дії */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => openMaterials(selectedLesson)}
+                className="w-full px-4 py-3 bg-pink-600 text-white rounded-xl text-sm font-medium hover:bg-pink-700"
+              >
+                Підготувати урок
+              </button>
+              <SendLinkButton key={selectedLesson.id} lessonId={selectedLesson.id} />
+            </div>
+
+            {selectedLesson.meetingLink && (
+              <a
+                href={selectedLesson.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-600 underline text-sm block"
+              >
+                Посилання на урок
+              </a>
             )}
 
             {reschedulingLesson && reschedulingLesson.id === selectedLesson.id && (
@@ -684,14 +822,16 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 </div>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={confirmReschedule}
-                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700"
+                    className="flex-1 px-4 py-2.5 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700"
                   >
-                    Підтвердити перенесення
+                    Перенести
                   </button>
                   <button
+                    type="button"
                     onClick={() => setReschedulingLesson(null)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
+                    className="px-4 py-2.5 bg-white text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100"
                   >
                     Скасувати
                   </button>
@@ -699,103 +839,38 @@ export default function CalendarView({ students }: { students: Student[] }) {
               </div>
             )}
 
-            {askNoShowFor === selectedLesson.id && (
-              <div className="bg-red-50 rounded-xl p-4 space-y-3">
-                <p className="text-sm font-medium text-gray-700">
-                  Учень не прийшов. Цей урок оплачується?
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => markNoShow(selectedLesson, true)}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
-                  >
-                    Так, оплачується
-                  </button>
-                  <button
-                    onClick={() => markNoShow(selectedLesson, false)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
-                  >
-                    Ні, не оплачується
-                  </button>
-                  <button
-                    onClick={() => setAskNoShowFor(null)}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
-                  >
-                    Назад
-                  </button>
-                </div>
-              </div>
+            {selectedLesson.paymentStatus === "PAID" && !isPrepaidStudent && (
+              <button
+                type="button"
+                onClick={() => clearPaidFlag(selectedLesson)}
+                className="text-xs text-gray-500 underline"
+              >
+                Зняти стару позначку «оплачено»
+              </button>
             )}
 
-            {selectedLesson.meetingLink && (
-              <a href={selectedLesson.meetingLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-pink-600 underline text-sm block"
-              >
-                Посилання на урок
-              </a>
-            )}
-
-            <div className="flex flex-wrap gap-2 pt-2">
+            {/* Рідкісні дії */}
+            <div className="flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-gray-100 pt-3 text-sm">
               <button
-                onClick={() => openMaterials(selectedLesson)}
-                className="px-4 py-2 bg-pink-50 text-pink-700 rounded-xl text-sm font-medium hover:bg-pink-100"
-              >
-                Підготувати урок
-              </button>
-              <button
-                onClick={() => toggleStatus(selectedLesson, "COMPLETED")}
-                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
-                  selectedLesson.status === "COMPLETED"
-                    ? "bg-green-600 text-white border-green-600"
-                    : "bg-green-50 text-green-700 border-transparent hover:bg-green-100"
-                }`}
-              >
-                Проведено
-              </button>
-              <button
-                onClick={() => {
-                  if (selectedLesson.status === "NO_SHOW") {
-                    toggleStatus(selectedLesson, "NO_SHOW");
-                  } else {
-                    setAskNoShowFor(selectedLesson.id);
-                  }
-                }}
-                className={`px-4 py-2 rounded-xl text-sm font-medium border-2 ${
-                  selectedLesson.status === "NO_SHOW"
-                    ? "bg-red-600 text-white border-red-600"
-                    : "bg-red-50 text-red-700 border-transparent hover:bg-red-100"
-                }`}
-              >
-                Учень не прийшов
-              </button>
-              {selectedLesson.paymentStatus === "PAID" && !isPrepaidStudent && (
-                <button
-                  onClick={() => clearPaidFlag(selectedLesson)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium border-2 bg-pink-600 text-white border-pink-600 hover:bg-pink-700"
-                >
-                  Зняти позначку «оплачено»
-                </button>
-              )}
-              <SendLinkButton key={selectedLesson.id} lessonId={selectedLesson.id} />
-              <button
+                type="button"
                 onClick={() => startReschedule(selectedLesson)}
-                className="px-4 py-2 bg-yellow-50 text-yellow-700 rounded-xl text-sm font-medium hover:bg-yellow-100"
+                className="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
               >
-                Перенести урок
+                Перенести
               </button>
               <button
+                type="button"
                 onClick={() => cancelLesson(selectedLesson)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200"
+                className="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
               >
                 Скасувати урок
               </button>
               <button
+                type="button"
                 onClick={() => deleteLessonPermanently(selectedLesson)}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700"
+                className="ml-auto px-3 py-2 rounded-lg text-red-600 hover:bg-red-50"
               >
-                Видалити урок
+                Видалити
               </button>
             </div>
           </div>
@@ -803,7 +878,12 @@ export default function CalendarView({ students }: { students: Student[] }) {
       )}
 
       {selectedLesson && showMaterials && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closePrep();
+          }}
+        >
           <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
             <div className="flex justify-between items-start">
               <div>
@@ -815,10 +895,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 </p>
               </div>
               <button
-                onClick={() => {
-                  setShowMaterials(false);
-                  setSelectedLesson(null);
-                }}
+                onClick={closePrep}
                 className="text-gray-400 hover:text-gray-600"
               >
                 Закрити
@@ -951,10 +1028,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
             </div>
 
             <button
-              onClick={() => {
-                setShowMaterials(false);
-                setSelectedLesson(null);
-              }}
+              onClick={closePrep}
               className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
             >
               Готово

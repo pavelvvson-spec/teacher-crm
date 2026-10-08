@@ -65,7 +65,7 @@ export default function SendLinkButton({ lessonId }: { lessonId: string }) {
       <button
         onClick={send}
         disabled={loading}
-        className="px-4 py-2 bg-sky-50 text-sky-700 rounded-xl text-sm font-medium hover:bg-sky-100 disabled:opacity-50"
+        className="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
       >
         {loading ? "Готую..." : "🔗 Надіслати посилання Zoom"}
       </button>
