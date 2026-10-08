@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import CheerBanner from "@/components/CheerBanner";
+import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,14 @@ function formatKyivTime(date: Date): string {
   }).format(date);
 }
 
+const DAY_DONE_PHRASES = [
+  "Сашуню, ти сьогодні супер! Тепер — чай, плед і відпочинок 💖",
+  "Усі уроки позаду. Пишаюся тобою! Відпочивай 🌙",
+  "Чудовий день, чудова вчителька. Час для себе ☕",
+  "Ти зробила це! Учні щасливчики, а тобі — заслужений відпочинок ✨",
+  "Робочий день закрито. Видихай і насолоджуйся вечором 🌸",
+];
+
 export default async function HomePage() {
   const now = new Date();
   const { year, month, day } = kyivParts(now);
@@ -74,6 +83,13 @@ export default async function HomePage() {
     include: { student: true },
     orderBy: { startAt: "asc" },
   });
+
+  // Урок вважається завершеним, якщо його відмічено проведеним або час уроку вже минув
+  const isDone = (l: typeof todayLessons[number]) => l.status === "COMPLETED" || l.endAt <= now;
+  const allDone = todayLessons.length > 0 && todayLessons.every(isDone);
+  const nextLessonId = todayLessons.find((l: typeof todayLessons[number]) => !isDone(l))?.id;
+  const donePhrase = DAY_DONE_PHRASES[day % DAY_DONE_PHRASES.length];
+  const doneCount = todayLessons.filter((l: typeof todayLessons[number]) => l.status === "COMPLETED").length;
 
   const todayIncome = todayLessons.reduce(
     (sum: number, l: typeof todayLessons[number]) => sum + l.price,
@@ -100,6 +116,7 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
+      <AutoRefresh />
       <CheerBanner />
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -137,28 +154,54 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">Заплановано на сьогодні</h2>
-        {todayLessons.length === 0 ? (
-          <p className="text-gray-500">На сьогодні уроків немає.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {todayLessons.map((lesson: typeof todayLessons[number]) => (
-              <div key={lesson.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-gray-800">
-                    {lesson.student.firstName} {lesson.student.lastName ?? ""}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formatKyivTime(new Date(lesson.startAt))} · {lesson.duration} хв
-                  </p>
-                </div>
-                <p className="font-semibold text-pink-600">{lesson.price} грн</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {allDone ? (
+        <div className="rounded-2xl shadow-sm p-8 sm:p-12 min-h-[55vh] flex flex-col items-center justify-center text-center bg-gradient-to-br from-pink-500 via-pink-400 to-purple-400 text-white">
+          <p className="text-6xl sm:text-7xl mb-4">🎉</p>
+          <h2 className="text-3xl sm:text-4xl font-bold">На сьогодні все!</h2>
+          <p className="text-lg sm:text-xl mt-4 max-w-xl leading-relaxed">{donePhrase}</p>
+          <p className="text-sm text-pink-50 mt-6">
+            Сьогодні уроків: {todayLessons.length}
+            {doneCount > 0 ? ` · відмічено проведеними: ${doneCount}` : ""}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Заплановано на сьогодні</h2>
+          {todayLessons.length === 0 ? (
+            <p className="text-gray-500">На сьогодні уроків немає.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {todayLessons.map((lesson: typeof todayLessons[number]) => {
+                const done = isDone(lesson);
+                const marked = lesson.status === "COMPLETED";
+                const isNext = lesson.id === nextLessonId;
+                return (
+                  <div
+                    key={lesson.id}
+                    className={`flex items-center justify-between py-3 ${done ? "opacity-50" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl w-6 text-center">
+                        {marked ? "✅" : done ? "⏱" : isNext ? "👉" : ""}
+                      </span>
+                      <div>
+                        <p className={`font-medium text-gray-800 ${done ? "line-through" : ""}`}>
+                          {lesson.student.firstName} {lesson.student.lastName ?? ""}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {formatKyivTime(new Date(lesson.startAt))} · {lesson.duration} хв
+                          {marked ? " · проведено" : done ? " · завершився" : isNext ? " · далі" : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="font-semibold text-pink-600">{lesson.price} грн</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
