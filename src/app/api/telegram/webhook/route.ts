@@ -10,6 +10,8 @@ import {
 import { checkAndMaybeSendSummary, settleStudentPeriodicPayments } from "@/lib/daily-checkup";
 import { calculateStudentBalance } from "@/lib/payments-utils";
 import { handleTeacherMessage, handleAssistantCallback } from "@/lib/teacher-assistant";
+import { transcribeTelegramFile } from "@/lib/transcribe";
+import { escapeTelegramHtml } from "@/lib/telegram";
 
 // Відповідь ШІ-помічника може тривати до ~30 секунд
 export const maxDuration = 60;
@@ -194,10 +196,31 @@ export async function POST(request: NextRequest) {
         await sendTelegramMessage(chatId, "⚠️ Сталася помилка. Спробуйте ще раз трохи пізніше.");
       }
     } else if (message.voice || message.audio) {
-      await sendTelegramMessage(
-        chatId,
-        "🎙️ Голосові я поки не розумію — це буде в наступній версії. Напишіть, будь ласка, текстом."
-      );
+      const media = message.voice ?? message.audio;
+      if (Number(media.duration) > 300) {
+        await sendTelegramMessage(
+          chatId,
+          "🎙️ Голосове задовге — до 5 хвилин, будь ласка. Розбийте на кілька коротших."
+        );
+      } else {
+        try {
+          const result = await transcribeTelegramFile(media.file_id);
+          if (!result.ok) {
+            await sendTelegramMessage(chatId, `⚠️ ${escapeTelegramHtml(result.error)}`);
+          } else {
+            await sendTelegramMessage(chatId, `🎙️ Почула: «${escapeTelegramHtml(result.text)}»`);
+            await handleTeacherMessage(
+              chatId,
+              result.text,
+              String(body.update_id ?? message.message_id),
+              "VOICE"
+            );
+          }
+        } catch (e) {
+          console.error("Voice handling error", e);
+          await sendTelegramMessage(chatId, "⚠️ Не вдалося обробити голосове. Спробуйте ще раз.");
+        }
+      }
     }
   }
 

@@ -102,7 +102,12 @@ async function saveAssistantReply(
   });
 }
 
-export async function handleTeacherMessage(chatId: string, text: string, updateId: string) {
+export async function handleTeacherMessage(
+  chatId: string,
+  text: string,
+  updateId: string,
+  source: "TEXT" | "VOICE" = "TEXT"
+) {
   // Захист від повторної доставки того самого повідомлення Telegram'ом
   const already = await prisma.assistantMessage.findUnique({ where: { telegramUpdateId: updateId } });
   if (already) return;
@@ -179,7 +184,7 @@ ${text}`;
   const journalText = (route.journal_text ?? "").trim();
   if (student && journalText && (route.action === "journal" || route.action === "advice")) {
     const entry = await prisma.studentJournalEntry.create({
-      data: { studentId: student.id, content: journalText, source: "TEXT" },
+      data: { studentId: student.id, content: journalText, source },
     });
     savedEntryId = entry.id;
   }
