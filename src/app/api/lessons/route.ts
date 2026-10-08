@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson, findExactDuplicateLesson } from "@/lib/lesson-conflict";
+import { syncCalendarSafely } from "@/lib/google-calendar";
+
+// Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -61,5 +65,6 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  await syncCalendarSafely();
   return NextResponse.json(lesson, { status: 201 });
 }

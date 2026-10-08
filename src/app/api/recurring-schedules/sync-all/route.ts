@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncStudentLessons } from "@/lib/recurring-schedule-sync";
+import { syncCalendarSafely } from "@/lib/google-calendar";
 
 export const maxDuration = 60;
 
@@ -42,5 +43,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (!dryRun) await syncCalendarSafely();
   return NextResponse.json({ dryRun, students: report });
 }

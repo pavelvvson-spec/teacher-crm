@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson } from "@/lib/lesson-conflict";
+import { syncCalendarSafely } from "@/lib/google-calendar";
+
+// Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
+export const maxDuration = 60;
 
 export async function PUT(
   request: NextRequest,
@@ -59,6 +63,7 @@ export async function PUT(
     data,
   });
 
+  await syncCalendarSafely();
   return NextResponse.json(lesson);
 }
 
@@ -73,6 +78,7 @@ export async function DELETE(
     await prisma.reminder.deleteMany({ where: { lessonId: id } });
     await prisma.payment.updateMany({ where: { lessonId: id }, data: { lessonId: null } });
     await prisma.lesson.delete({ where: { id } });
+    await syncCalendarSafely();
     return NextResponse.json({ success: true });
   }
 
@@ -81,5 +87,6 @@ export async function DELETE(
     data: { status: "CANCELLED_BY_TEACHER" },
   });
 
+  await syncCalendarSafely();
   return NextResponse.json({ success: true });
 }

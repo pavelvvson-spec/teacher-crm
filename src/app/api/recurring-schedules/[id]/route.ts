@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { findConflictingLesson } from "@/lib/lesson-conflict";
 import { syncStudentLessons } from "@/lib/recurring-schedule-sync";
 import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
+import { syncCalendarSafely } from "@/lib/google-calendar";
+
+// Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
+export const maxDuration = 60;
 
 const WEEKS_AHEAD = 8;
 
@@ -69,6 +73,7 @@ export async function PATCH(
 
   const { lessonsCreated, lessonsCancelled } = await syncStudentLessons(existing.studentId, new Date());
 
+  await syncCalendarSafely();
   return NextResponse.json({ schedule: updated, lessonsCreated, lessonsCancelled });
 }
 
@@ -87,5 +92,6 @@ export async function DELETE(
 
   const { lessonsCancelled } = await syncStudentLessons(existing.studentId, new Date());
 
+  await syncCalendarSafely();
   return NextResponse.json({ success: true, lessonsCancelled });
 }

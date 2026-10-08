@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncCalendarSafely } from "@/lib/google-calendar";
+
+// Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
+export const maxDuration = 60;
 
 async function freeUpFutureLessons(studentId: string) {
   const now = new Date();
@@ -51,6 +55,7 @@ export async function PUT(
     await freeUpFutureLessons(id);
   }
 
+  await syncCalendarSafely();
   return NextResponse.json(student);
 }
 
@@ -67,6 +72,7 @@ export async function DELETE(
     await prisma.recurringSchedule.deleteMany({ where: { studentId: id } });
     await prisma.lesson.deleteMany({ where: { studentId: id } });
     await prisma.student.delete({ where: { id } });
+    await syncCalendarSafely();
     return NextResponse.json({ success: true });
   }
 
@@ -77,5 +83,6 @@ export async function DELETE(
 
   await freeUpFutureLessons(id);
 
+  await syncCalendarSafely();
   return NextResponse.json({ success: true });
 }
