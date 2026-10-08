@@ -102,7 +102,7 @@ export default function StudentJournal({
     : entries.length;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 space-y-6 max-w-2xl">
+    <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-6">
       {/* Портрет учня */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -118,7 +118,7 @@ export default function StudentJournal({
             type="button"
             onClick={makePortrait}
             disabled={portraitLoading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
           >
             {portraitLoading
               ? "ШІ аналізує (до 30 секунд)..."
@@ -166,7 +166,7 @@ export default function StudentJournal({
           type="button"
           onClick={addEntry}
           disabled={saving || !text.trim()}
-          className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50"
+          className="px-4 py-2 bg-pink-50 text-pink-700 rounded-lg text-sm font-medium hover:bg-pink-100 disabled:opacity-50"
         >
           {saving ? "Збереження..." : "Додати в журнал"}
         </button>

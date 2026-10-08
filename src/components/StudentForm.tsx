@@ -77,16 +77,9 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
-  const [savedNotes, setSavedNotes] = useState(initialValues?.notes ?? "");
-  const [notesSaving, setNotesSaving] = useState(false);
-  const [notesMsg, setNotesMsg] = useState("");
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [a, setA] = useState(0);
-  const [b, setB] = useState(0);
-  const [deleteAnswer, setDeleteAnswer] = useState("");
-  const [deleteError, setDeleteError] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  // Знімок збережених даних — щоб показувати «є незбережені зміни»
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(values));
+  const isDirty = isEditing && JSON.stringify(values) !== savedSnapshot;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -113,7 +106,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
 
     if (isEditing) {
       // Залишаємось на картці учня
-      setSavedNotes(values.notes);
+      setSavedSnapshot(JSON.stringify(values));
       setSavedMsg("✓ Збережено");
       setTimeout(() => setSavedMsg(""), 3000);
       router.refresh();
@@ -124,347 +117,253 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
     router.refresh();
   }
 
-  async function saveNotesOnly() {
-    if (!initialValues?.id) return;
-    setNotesSaving(true);
-    setNotesMsg("");
-    const res = await fetch(`/api/students/${initialValues.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...values, isActive: initialValues.isActive ?? true }),
-    });
-    setNotesSaving(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setNotesMsg(data.error || "Не вдалося зберегти");
-      return;
-    }
-    setSavedNotes(values.notes);
-    setNotesMsg("✓ Нотатки збережено");
-    setTimeout(() => setNotesMsg(""), 3000);
-    router.refresh();
-  }
-
-  async function handleDeactivate() {
-    if (!initialValues?.id) return;
-    if (!confirm("Деактивувати цього учня?")) return;
-
-    await fetch(`/api/students/${initialValues.id}`, { method: "DELETE" });
-    router.push("/students");
-    router.refresh();
-  }
-
-  function openDeleteConfirm() {
-    setA(Math.floor(Math.random() * 9) + 1);
-    setB(Math.floor(Math.random() * 9) + 1);
-    setDeleteAnswer("");
-    setDeleteError("");
-    setShowDeleteConfirm(true);
-  }
-
-  async function handleDeletePermanently() {
-    if (!initialValues?.id) return;
-    if (Number(deleteAnswer) !== a + b) {
-      setDeleteError("Невірна відповідь. Спробуй ще раз.");
-      return;
-    }
-    setDeleting(true);
-    await fetch(`/api/students/${initialValues.id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hard: true }),
-    });
-    setDeleting(false);
-    setShowDeleteConfirm(false);
-    router.push("/students");
-    router.refresh();
-  }
+  const inputCls =
+    "w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300";
+  const labelCls = "block text-sm text-gray-600 mb-1";
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-5 max-w-2xl">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-6">
+      {/* Основне */}
+      <section className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Ім&apos;я *</label>
+            <input
+              required
+              value={values.firstName}
+              onChange={(e) => setValues({ ...values, firstName: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Прізвище</label>
+            <input
+              value={values.lastName}
+              onChange={(e) => setValues({ ...values, lastName: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Контакти */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Контакти</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Телефон</label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={values.phone}
+              onChange={(e) => setValues({ ...values, phone: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Telegram</label>
+            <input
+              value={values.telegramUsername}
+              onChange={(e) => setValues({ ...values, telegramUsername: e.target.value })}
+              placeholder="@username"
+              autoCapitalize="none"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls}>Куди надсилати посилання на урок</label>
+            <select
+              value={values.contactChannel}
+              onChange={(e) => setValues({ ...values, contactChannel: e.target.value })}
+              className={inputCls}
+            >
+              <option value="TELEGRAM">Telegram</option>
+              <option value="VIBER">Viber</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Номер Viber</label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={values.viberPhone}
+              onChange={(e) => setValues({ ...values, viberPhone: e.target.value })}
+              placeholder="Якщо порожньо — з поля «Телефон»"
+              className={inputCls}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Про учня */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Про учня</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>День народження</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={31}
+                value={values.birthDay}
+                onChange={(e) => setValues({ ...values, birthDay: e.target.value })}
+                placeholder="День"
+                className="w-16 px-2 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300"
+              />
+              <select
+                value={values.birthMonth}
+                onChange={(e) => setValues({ ...values, birthMonth: e.target.value })}
+                className="flex-1 min-w-0 px-2 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300"
+              >
+                <option value="">Місяць</option>
+                {MONTHS_UA.map((m, i) => (
+                  <option key={m} value={String(i + 1)}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={values.birthYear}
+                onChange={(e) => setValues({ ...values, birthYear: e.target.value })}
+                placeholder="Рік"
+                className="w-20 px-2 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-1.5">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={values.isAdult}
+                  onChange={(e) => setValues({ ...values, isAdult: e.target.checked })}
+                />
+                <span className="text-xs text-gray-500">Дорослий (якщо рік не вказуєте)</span>
+              </label>
+              {values.birthYear && Number(values.birthYear) > 1920 && (
+                <span className="text-xs text-gray-400">≈ {new Date().getFullYear() - Number(values.birthYear)} р.</span>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Рівень англійської</label>
+            <div className="grid grid-cols-6 gap-1">
+              {ENGLISH_LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setValues({ ...values, englishLevel: level })}
+                  className={`py-2.5 rounded-lg text-sm font-medium ${
+                    values.englishLevel === level
+                      ? "bg-pink-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ім&apos;я *</label>
-          <input
-            required
-            value={values.firstName}
-            onChange={(e) => setValues({ ...values, firstName: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+          <label className={labelCls}>Нотатки</label>
+          <textarea
+            value={values.notes}
+            onChange={(e) => setValues({ ...values, notes: e.target.value })}
+            rows={3}
+            placeholder="Постійні факти про учня: вік, мета, з чим займаєтесь, особливості. ШІ читає це перед кожною відповіддю."
+            className={inputCls}
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Прізвище</label>
-          <input
-            value={values.lastName}
-            onChange={(e) => setValues({ ...values, lastName: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
-          <input
-            value={values.phone}
-            onChange={(e) => setValues({ ...values, phone: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Telegram username</label>
-          <input
-            value={values.telegramUsername}
-            onChange={(e) => setValues({ ...values, telegramUsername: e.target.value })}
-            placeholder="@username"
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Куди надсилати посилання на урок</label>
-          <select
-            value={values.contactChannel}
-            onChange={(e) => setValues({ ...values, contactChannel: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          >
-            <option value="TELEGRAM">Telegram</option>
-            <option value="VIBER">Viber</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Номер Viber</label>
-          <input
-            value={values.viberPhone}
-            onChange={(e) => setValues({ ...values, viberPhone: e.target.value })}
-            placeholder="Якщо порожньо — береться «Телефон»"
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">День народження</label>
-          <div className="flex gap-2">
+      </section>
+
+      {/* Уроки й оплата */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Уроки й оплата</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls}>Тривалість (хв)</label>
             <input
               type="number"
               inputMode="numeric"
               min={1}
-              max={31}
-              value={values.birthDay}
-              onChange={(e) => setValues({ ...values, birthDay: e.target.value })}
-              placeholder="День"
-              className="w-20 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+              value={values.defaultLessonDuration}
+              onChange={(e) => setValues({ ...values, defaultLessonDuration: Number(e.target.value) })}
+              className={inputCls}
             />
+          </div>
+          <div>
+            <label className={labelCls}>Ціна уроку (грн)</label>
+            {isEditing ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  readOnly
+                  value={values.defaultLessonPrice}
+                  className="w-full min-w-0 px-3 py-2.5 border border-gray-100 bg-gray-50 rounded-xl text-gray-700"
+                />
+                <ChangePriceButton
+                  studentId={initialValues!.id!}
+                  currentPrice={values.defaultLessonPrice}
+                  onDone={(newPrice) => {
+                    setValues((prev) => ({ ...prev, defaultLessonPrice: newPrice }));
+                    // ціна вже збережена окремо — оновлюємо знімок, щоб не було «незбережених змін»
+                    setSavedSnapshot((snap) => {
+                      try {
+                        return JSON.stringify({ ...JSON.parse(snap), defaultLessonPrice: newPrice });
+                      } catch {
+                        return snap;
+                      }
+                    });
+                    router.refresh();
+                  }}
+                />
+              </div>
+            ) : (
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={values.defaultLessonPrice}
+                onChange={(e) => setValues({ ...values, defaultLessonPrice: Number(e.target.value) })}
+                className={inputCls}
+              />
+            )}
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Тип оплати</label>
             <select
-              value={values.birthMonth}
-              onChange={(e) => setValues({ ...values, birthMonth: e.target.value })}
-              className="flex-1 min-w-0 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+              value={values.paymentFrequency}
+              onChange={(e) => setValues({ ...values, paymentFrequency: e.target.value })}
+              className={inputCls}
             >
-              <option value="">Місяць</option>
-              {MONTHS_UA.map((m, i) => (
-                <option key={m} value={String(i + 1)}>
-                  {m}
-                </option>
+              {Object.entries(PAYMENT_FREQUENCY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={values.birthYear}
-              onChange={(e) => setValues({ ...values, birthYear: e.target.value })}
-              placeholder="Рік"
-              className="w-24 px-3 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
           </div>
-          <label className="flex items-center gap-2 mt-2">
-            <input
-              type="checkbox"
-              checked={values.isAdult}
-              onChange={(e) => setValues({ ...values, isAdult: e.target.checked })}
-            />
-            <span className="text-sm text-gray-600">Дорослий (якщо рік не вказуєте)</span>
-          </label>
-          {values.birthYear && Number(values.birthYear) > 1920 && (
-            <p className="text-xs text-gray-400 mt-1">≈ {new Date().getFullYear() - Number(values.birthYear)} р.</p>
-          )}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Рівень англійської</label>
-          <select
-            value={values.englishLevel}
-            onChange={(e) => setValues({ ...values, englishLevel: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          >
-            {ENGLISH_LEVELS.map((level) => (
-              <option key={level} value={level}>{level}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Формат занять</label>
-          <select
-            value={values.lessonFormat}
-            onChange={(e) => setValues({ ...values, lessonFormat: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          >
-            <option value="ONLINE">Онлайн</option>
-            <option value="OFFLINE">Офлайн</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Тривалість уроку (хв)</label>
-          <input
-            type="number"
-            min={1}
-            value={values.defaultLessonDuration}
-            onChange={(e) => setValues({ ...values, defaultLessonDuration: Number(e.target.value) })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Вартість уроку (грн)</label>
-          {isEditing ? (
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value={values.defaultLessonPrice}
-                className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl text-gray-700"
-              />
-              <ChangePriceButton
-                studentId={initialValues!.id!}
-                currentPrice={values.defaultLessonPrice}
-                onDone={(newPrice) => {
-                  setValues((prev) => ({ ...prev, defaultLessonPrice: newPrice }));
-                  router.refresh();
-                }}
-              />
-            </div>
-          ) : (
-            <input
-              type="number"
-              min={0}
-              value={values.defaultLessonPrice}
-              onChange={(e) => setValues({ ...values, defaultLessonPrice: Number(e.target.value) })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Тип оплати</label>
-          <select
-            value={values.paymentFrequency}
-            onChange={(e) => setValues({ ...values, paymentFrequency: e.target.value })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-          >
-            {Object.entries(PAYMENT_FREQUENCY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Нотатки</label>
-        <textarea
-          value={values.notes}
-          onChange={(e) => setValues({ ...values, notes: e.target.value })}
-          rows={3}
-          placeholder="Постійні факти про учня: вік, мета, з чим займаєтесь, особливості. ШІ читає це перед кожною відповіддю."
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-        />
-        {isEditing && (
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            <button
-              type="button"
-              onClick={saveNotesOnly}
-              disabled={notesSaving || values.notes === savedNotes}
-              className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-40"
-            >
-              {notesSaving ? "Збереження..." : "Зберегти нотатки"}
-            </button>
-            {values.notes !== savedNotes && !notesSaving && (
-              <span className="text-xs text-amber-600">Є незбережені зміни</span>
-            )}
-            {notesMsg && <span className="text-sm text-green-600">{notesMsg}</span>}
-          </div>
-        )}
-      </div>
-
-      {isEditing && (
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={values.isActive}
-            onChange={(e) => setValues({ ...values, isActive: e.target.checked })}
-          />
-          <span className="text-sm text-gray-700">Активний учень</span>
-        </label>
-      )}
+      </section>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
-      <div className="flex items-center gap-3 pt-2 flex-wrap">
+      {/* Кнопка збереження; на телефоні «прилипає» до низу екрана, коли є зміни */}
+      <div
+        className={`flex items-center gap-3 ${
+          isDirty ? "sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] sm:bottom-3 z-10 bg-white/95 backdrop-blur rounded-2xl shadow-lg p-2 -mx-2" : ""
+        }`}
+      >
         <button
           type="submit"
-          disabled={loading}
-          className="px-6 py-3 bg-pink-600 text-white font-medium rounded-xl hover:bg-pink-700 disabled:opacity-50"
+          disabled={loading || (isEditing && !isDirty)}
+          className="flex-1 sm:flex-none px-6 py-3 bg-pink-600 text-white font-medium rounded-xl hover:bg-pink-700 disabled:opacity-40"
         >
-          {loading ? "Збереження..." : "Зберегти"}
+          {loading ? "Збереження..." : isEditing ? "Зберегти" : "Додати учня"}
         </button>
+        {isDirty && !loading && <span className="text-xs text-amber-600">Є незбережені зміни</span>}
         {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
-        {isEditing && (
-          <>
-            <button
-              type="button"
-              onClick={handleDeactivate}
-              className="px-6 py-3 bg-red-50 text-red-600 font-medium rounded-xl hover:bg-red-100"
-            >
-              Деактивувати
-            </button>
-            <button
-              type="button"
-              onClick={openDeleteConfirm}
-              className="px-6 py-3 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700"
-            >
-              Видалити учня
-            </button>
-          </>
-        )}
       </div>
-
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">Підтвердження</h2>
-            <p className="text-sm text-gray-600">
-              Учня та всі його уроки, оплати й розклад буде видалено назавжди. Цю дію не можна скасувати.
-            </p>
-            <p className="text-sm font-medium text-gray-700">
-              Щоб підтвердити, розв&apos;яжи приклад: {a} + {b} = ?
-            </p>
-            <input
-              type="number"
-              value={deleteAnswer}
-              onChange={(e) => setDeleteAnswer(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
-              autoFocus
-            />
-            {deleteError && <p className="text-red-600 text-sm">{deleteError}</p>}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleDeletePermanently}
-                disabled={deleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? "Видалення..." : "Підтвердити видалення"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200"
-              >
-                Скасувати
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </form>
   );
 }

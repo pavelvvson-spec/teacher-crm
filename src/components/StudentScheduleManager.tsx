@@ -146,7 +146,7 @@ export default function StudentScheduleManager({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+    <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-800">Сталий графік</h2>
         <button
