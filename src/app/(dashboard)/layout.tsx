@@ -146,7 +146,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             type="button"
             onClick={goBack}
-            className="sm:hidden mb-4 inline-flex items-center gap-1 px-3 py-2 -ml-1 rounded-xl bg-white text-pink-600 font-medium shadow-sm"
+            className="mb-4 inline-flex items-center gap-1 px-3 py-2 sm:py-1.5 -ml-1 rounded-xl bg-white text-pink-600 font-medium shadow-sm hover:bg-pink-50 sm:text-sm"
           >
             <svg
               className="w-5 h-5"
