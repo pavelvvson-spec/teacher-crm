@@ -174,21 +174,7 @@ export default function PaymentsList({ rows }: { rows: PaymentRow[] }) {
         <>
           <Group title="Боргують" dot="bg-red-500" rows={debtors} showKind={showKind} />
           <Group title="Передоплата" dot="bg-violet-500" rows={prepaid} showKind={showKind} />
-          {paid.length > 0 && (
-            <details className="group" open={debtors.length + prepaid.length === 0 || query.trim() !== ""}>
-              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 pt-4 pb-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Усе оплачено · {paid.length}
-                <span className="ml-1 normal-case font-normal text-gray-400 group-open:hidden">показати</span>
-                <span className="ml-1 normal-case font-normal text-gray-400 hidden group-open:inline">сховати</span>
-              </summary>
-              <div className="divide-y divide-gray-100">
-                {paid.map((r) => (
-                  <Row key={r.id} row={r} showKind={showKind} />
-                ))}
-              </div>
-            </details>
-          )}
+          <Group title="Усе оплачено" dot="bg-green-500" rows={paid} showKind={showKind} />
         </>
       )}
     </div>
