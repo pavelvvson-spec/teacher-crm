@@ -6,6 +6,7 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/setup-teacher",
   "/api/telegram/webhook",
+  "/api/fireflies/webhook",
   "/api/cron/daily-checkup",
   "/api/cron/daily-summary",
 ];

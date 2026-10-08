@@ -1,15 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { isCalendarConfigured, serviceAccountEmail } from "@/lib/google-calendar";
 import CalendarSyncButton from "@/components/CalendarSyncButton";
+import { isFirefliesConfigured } from "@/lib/fireflies";
 
 export const dynamic = "force-dynamic";
 
 export default async function TelegramSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ calOk?: string; calError?: string }>;
+  searchParams: Promise<{ calOk?: string; calError?: string; ffOk?: string; ffError?: string }>;
 }) {
-  const { calOk, calError } = await searchParams;
+  const { calOk, calError, ffOk, ffError } = await searchParams;
+  const firefliesReady = isFirefliesConfigured();
   const calendarReady = isCalendarConfigured();
   const saEmail = serviceAccountEmail();
   const students = await prisma.student.findMany({
@@ -83,6 +85,32 @@ export default async function TelegramSettingsPage({
         )}
         {calOk && <p className="text-sm text-green-600">✓ Синхронізовано: {calOk}</p>}
         {calError && <p className="text-sm text-red-600">⚠️ {calError}</p>}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+        <h2 className="text-lg font-semibold text-gray-800">🎧 Fireflies → журнал учня</h2>
+        <p className="text-gray-600 text-sm">
+          Після кожного записаного уроку CRM сама забирає текст з Fireflies, ШІ робить стислий запис у журнал
+          учня, а вчительці приходить повідомлення в Telegram (з кнопкою «Прибрати з журналу»). Раз на добу CRM
+          додатково перевіряє, чи нічого не пропущено.
+        </p>
+        {firefliesReady ? (
+          <div className="space-y-2">
+            <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-lg">Налаштовано</span>
+            <form action="/api/fireflies/poll" method="post">
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+              >
+                Перевірити нові записи зараз
+              </button>
+            </form>
+          </div>
+        ) : (
+          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">Не налаштовано</span>
+        )}
+        {ffOk && <p className="text-sm text-green-600">✓ {ffOk}</p>}
+        {ffError && <p className="text-sm text-red-600">⚠️ {ffError}</p>}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">

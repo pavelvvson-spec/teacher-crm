@@ -223,6 +223,9 @@ model StudentJournalEntry {
   student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
   source    JournalSource @default(TEXT)
   content   String
+  lessonId  String?
+  // id запису Fireflies — щоб той самий урок не потрапив у журнал двічі
+  externalId String?      @unique
   createdAt DateTime      @default(now())
 
   @@index([studentId, createdAt])
