@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import CheerBanner from "@/components/CheerBanner";
+import ConfettiCelebration from "@/components/ConfettiCelebration";
 import AutoRefresh from "@/components/AutoRefresh";
 import BirthdayCard, { type BirthdayPerson } from "@/components/BirthdayCard";
 import { ageYears } from "@/lib/pedagogy";
@@ -181,7 +182,7 @@ export default async function HomePage() {
       </div>
 
       {allDone ? (
-        <div className="rounded-2xl shadow-sm p-8 sm:p-12 min-h-[55vh] flex flex-col items-center justify-center text-center bg-gradient-to-br from-pink-500 via-pink-400 to-purple-400 text-white">
+        <ConfettiCelebration className="rounded-2xl shadow-sm p-8 sm:p-12 min-h-[55vh] flex flex-col items-center justify-center text-center bg-gradient-to-br from-pink-500 via-pink-400 to-purple-400 text-white">
           <p className="text-6xl sm:text-7xl mb-4">🎉</p>
           <h2 className="text-3xl sm:text-4xl font-bold">На сьогодні все!</h2>
           <p className="text-lg sm:text-xl mt-4 max-w-xl leading-relaxed">{donePhrase}</p>
@@ -189,7 +190,8 @@ export default async function HomePage() {
             Сьогодні уроків: {todayLessons.length}
             {doneCount > 0 ? ` · відмічено проведеними: ${doneCount}` : ""}
           </p>
-        </div>
+          <p className="text-xs text-pink-100/80 mt-3">торкніться будь-де — буде салют 🎊</p>
+        </ConfettiCelebration>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-3">Заплановано на сьогодні</h2>
