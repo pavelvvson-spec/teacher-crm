@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Entry = {
   id: string;
@@ -48,7 +48,11 @@ export default function StudentJournal({
   const [portraitAt, setPortraitAt] = useState(initialPortraitAt);
   const [portraitLoading, setPortraitLoading] = useState(false);
   const [portraitError, setPortraitError] = useState("");
-  const [showPortrait, setShowPortrait] = useState(true);
+  // На телефоні портрет спершу згорнутий (щоб не «вивалювати» довгий текст), на комп'ютері — розгорнутий
+  const [showPortrait, setShowPortrait] = useState(false);
+  useEffect(() => {
+    if (window.innerWidth >= 640) setShowPortrait(true);
+  }, []);
 
   async function addEntry() {
     if (!text.trim()) return;
@@ -133,9 +137,9 @@ export default function StudentJournal({
             <button
               type="button"
               onClick={() => setShowPortrait(!showPortrait)}
-              className="text-xs text-indigo-600 hover:underline"
+              className="text-sm text-pink-700 font-medium hover:underline"
             >
-              {showPortrait ? "Згорнути" : "Показати портрет"}
+              {showPortrait ? "Згорнути ▴" : "Показати портрет ▾"}
             </button>
             {showPortrait && (
               <div className="mt-2 bg-indigo-50/50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap">
