@@ -49,6 +49,10 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [savedNotes, setSavedNotes] = useState(initialValues?.notes ?? "");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesMsg, setNotesMsg] = useState("");
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [a, setA] = useState(0);
@@ -60,6 +64,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setSavedMsg("");
     setLoading(true);
 
     const url = isEditing ? `/api/students/${initialValues!.id}` : "/api/students";
@@ -79,7 +84,37 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
       return;
     }
 
+    if (isEditing) {
+      // Залишаємось на картці учня
+      setSavedNotes(values.notes);
+      setSavedMsg("✓ Збережено");
+      setTimeout(() => setSavedMsg(""), 3000);
+      router.refresh();
+      return;
+    }
+
     router.push("/students");
+    router.refresh();
+  }
+
+  async function saveNotesOnly() {
+    if (!initialValues?.id) return;
+    setNotesSaving(true);
+    setNotesMsg("");
+    const res = await fetch(`/api/students/${initialValues.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...values, isActive: initialValues.isActive ?? true }),
+    });
+    setNotesSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setNotesMsg(data.error || "Не вдалося зберегти");
+      return;
+    }
+    setSavedNotes(values.notes);
+    setNotesMsg("✓ Нотатки збережено");
+    setTimeout(() => setNotesMsg(""), 3000);
     router.refresh();
   }
 
@@ -236,8 +271,25 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
           value={values.notes}
           onChange={(e) => setValues({ ...values, notes: e.target.value })}
           rows={3}
+          placeholder="Постійні факти про учня: вік, мета, з чим займаєтесь, особливості. ШІ читає це перед кожною відповіддю."
           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
         />
+        {isEditing && (
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            <button
+              type="button"
+              onClick={saveNotesOnly}
+              disabled={notesSaving || values.notes === savedNotes}
+              className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-40"
+            >
+              {notesSaving ? "Збереження..." : "Зберегти нотатки"}
+            </button>
+            {values.notes !== savedNotes && !notesSaving && (
+              <span className="text-xs text-amber-600">Є незбережені зміни</span>
+            )}
+            {notesMsg && <span className="text-sm text-green-600">{notesMsg}</span>}
+          </div>
+        )}
       </div>
 
       {isEditing && (
@@ -261,6 +313,7 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
         >
           {loading ? "Збереження..." : "Зберегти"}
         </button>
+        {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
         {isEditing && (
           <>
             <button
