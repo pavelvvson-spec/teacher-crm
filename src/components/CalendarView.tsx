@@ -17,8 +17,7 @@ import LessonForm from "@/components/LessonForm";
 import CalendarResetMenu from "@/components/CalendarResetMenu";
 import SyncAllSchedulesButton from "@/components/SyncAllSchedulesButton";
 import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
-import CopyPrepButton from "@/components/CopyPrepButton";
-import AiPrepButton from "@/components/AiPrepButton";
+import LessonPrepModal from "@/components/LessonPrepModal";
 import SendLinkButton from "@/components/SendLinkButton";
 
 type Student = {
@@ -46,14 +45,6 @@ type Lesson = {
   student: { firstName: string; lastName: string | null };
 };
 
-type Material = {
-  id: string;
-  type: string;
-  title: string;
-  url: string;
-  createdAt: string;
-};
-
 type ViewMode = "day" | "week" | "month";
 
 const WEEKDAY_HEADERS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
@@ -71,16 +62,6 @@ export default function CalendarView({ students }: { students: Student[] }) {
   const [askNoShowFor, setAskNoShowFor] = useState<string | null>(null);
 
   const [showMaterials, setShowMaterials] = useState(false);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [materialsLoading, setMaterialsLoading] = useState(false);
-  const [newLinkTitle, setNewLinkTitle] = useState("");
-  const [newLinkUrl, setNewLinkUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [noteText, setNoteText] = useState("");
-  const [savingNote, setSavingNote] = useState(false);
-  const [homeworkText, setHomeworkText] = useState("");
-  const [savingHomework, setSavingHomework] = useState(false);
-  const [sendingHomework, setSendingHomework] = useState(false);
 
   const getRange = useCallback(() => {
     if (viewMode === "day") {
@@ -137,21 +118,17 @@ export default function CalendarView({ students }: { students: Student[] }) {
   }
 
   function closePrep() {
-    if (selectedLesson) {
-      const dirty =
-        noteText !== (selectedLesson.teacherNotes || "") || homeworkText !== (selectedLesson.homework || "");
-      if (dirty && !confirm("Нотатку або ДЗ не збережено. Закрити без збереження?")) return;
-    }
     setShowMaterials(false);
     setSelectedLesson(null);
   }
+
 
   useEffect(() => {
     if (!selectedLesson && !showForm) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (showForm) setShowForm(false);
-      else if (showMaterials) closePrep();
+      else if (showMaterials) return; // вікно підготовки закривається само (з перевіркою незбереженого)
       else closeLesson();
     }
     document.addEventListener("keydown", onKey);
@@ -247,121 +224,11 @@ export default function CalendarView({ students }: { students: Student[] }) {
     loadLessons();
   }
 
-  async function loadMaterials(lessonId: string) {
-    setMaterialsLoading(true);
-    const res = await fetch(`/api/lessons/${lessonId}/materials`);
-    const data = await res.json();
-    setMaterials(data);
-    setMaterialsLoading(false);
-  }
-
   function openMaterials(lesson: Lesson) {
     setSelectedLesson(lesson);
     setShowMaterials(true);
-    setNewLinkTitle("");
-    setNewLinkUrl("");
-    setNoteText(lesson.teacherNotes || "");
-    setHomeworkText(lesson.homework || "");
-    loadMaterials(lesson.id);
   }
 
-  function handleCopied(result: { teacherNotes: string | null; homework: string | null }) {
-    if (!selectedLesson) return;
-    setNoteText(result.teacherNotes || "");
-    setHomeworkText(result.homework || "");
-    setSelectedLesson({
-      ...selectedLesson,
-      teacherNotes: result.teacherNotes,
-      homework: result.homework,
-    });
-    setLessons((prev) =>
-      prev.map((l) =>
-        l.id === selectedLesson.id
-          ? { ...l, teacherNotes: result.teacherNotes, homework: result.homework }
-          : l
-      )
-    );
-    loadMaterials(selectedLesson.id);
-  }
-
-  async function saveNote() {
-    if (!selectedLesson) return;
-    setSavingNote(true);
-    await updateLessonFields(selectedLesson, { teacherNotes: noteText });
-    setSavingNote(false);
-  }
-
-  async function saveHomework() {
-    if (!selectedLesson) return;
-    setSavingHomework(true);
-    await updateLessonFields(selectedLesson, { homework: homeworkText });
-    setSavingHomework(false);
-  }
-
-  async function sendHomeworkToTelegram() {
-    if (!selectedLesson) return;
-    setSendingHomework(true);
-    await updateLessonFields(selectedLesson, { homework: homeworkText });
-    const res = await fetch(`/api/lessons/${selectedLesson.id}/send-homework`, {
-      method: "POST",
-    });
-    setSendingHomework(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error || "Не вдалося надіслати ДЗ");
-    } else {
-      alert("Домашнє завдання надіслано учню в Telegram!");
-    }
-  }
-
-  async function addLinkMaterial() {
-    if (!selectedLesson || !newLinkTitle || !newLinkUrl) return;
-    await fetch(`/api/lessons/${selectedLesson.id}/materials`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newLinkTitle, url: newLinkUrl }),
-    });
-    setNewLinkTitle("");
-    setNewLinkUrl("");
-    loadMaterials(selectedLesson.id);
-  }
-
-  async function uploadFileMaterial(file: File) {
-    if (!selectedLesson) return;
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("title", file.name);
-    const res = await fetch(`/api/lessons/${selectedLesson.id}/materials`, {
-      method: "POST",
-      body: formData,
-    });
-    setUploading(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert("Помилка завантаження: " + (data.error || res.status));
-      return;
-    }
-    loadMaterials(selectedLesson.id);
-  }
-
-  async function deleteMaterial(materialId: string) {
-    if (!selectedLesson) return;
-    if (!confirm("Видалити цей матеріал?")) return;
-    await fetch(`/api/lessons/${selectedLesson.id}/materials`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ materialId }),
-    });
-    loadMaterials(selectedLesson.id);
-  }
-
-  const materialTypeLabels: Record<string, string> = {
-    LINK: "Посилання",
-    YOUTUBE: "YouTube",
-    PDF: "PDF",
-    IMAGE: "Скріншот",
-  };
 
   const { from } = getRange();
 
@@ -878,163 +745,15 @@ export default function CalendarView({ students }: { students: Student[] }) {
       )}
 
       {selectedLesson && showMaterials && (
-        <div
-          className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closePrep();
+        <LessonPrepModal
+          key={selectedLesson.id}
+          lesson={selectedLesson}
+          onClose={closePrep}
+          onSaved={(fields) => {
+            setSelectedLesson((prev) => (prev ? { ...prev, ...fields } : prev));
+            setLessons((prev) => prev.map((l) => (l.id === selectedLesson.id ? { ...l, ...fields } : l)));
           }}
-        >
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">Підготовка до уроку</h2>
-                <p className="text-gray-500 text-sm">
-                  {selectedLesson.student.firstName} {selectedLesson.student.lastName ?? ""} ·{" "}
-                  {new Date(selectedLesson.startAt).toLocaleDateString("uk-UA")}{" "}
-                  {formatTime(new Date(selectedLesson.startAt))}
-                </p>
-              </div>
-              <button
-                onClick={closePrep}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                Закрити
-              </button>
-            </div>
-
-            <CopyPrepButton lessonId={selectedLesson.id} onCopied={handleCopied} />
-
-            <AiPrepButton
-              lessonId={selectedLesson.id}
-              onUsePlan={(text) => setNoteText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
-              onUseHomework={(text) => setHomeworkText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
-            />
-
-            <div className="border-b border-gray-100 pb-4 space-y-2">
-              <p className="text-sm font-medium text-gray-700">Нотатка до уроку</p>
-              <textarea
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Наприклад: не забути перевірити знання слів, перевірити дз..."
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-              <button
-                onClick={saveNote}
-                disabled={savingNote}
-                className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50"
-              >
-                {savingNote ? "Збереження..." : "Зберегти нотатку"}
-              </button>
-            </div>
-
-            <div className="border-b border-gray-100 pb-4 space-y-2">
-              <p className="text-sm font-medium text-gray-700">Домашнє завдання (для наступного уроку)</p>
-              <textarea
-                value={homeworkText}
-                onChange={(e) => setHomeworkText(e.target.value)}
-                placeholder="Наприклад: вивчити 10 слів, зробити вправи 3-5 на стор. 12..."
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={saveHomework}
-                  disabled={savingHomework}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {savingHomework ? "Збереження..." : "Зберегти домашнє завдання"}
-                </button>
-                <button
-                  onClick={sendHomeworkToTelegram}
-                  disabled={sendingHomework}
-                  className="px-4 py-2 bg-[#0088cc] text-white rounded-lg text-sm font-medium hover:bg-[#0077b3] disabled:opacity-50 flex items-center gap-1"
-                >
-                  ✈️ {sendingHomework ? "Надсилання..." : "Відправити ДЗ в Telegram"}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {materialsLoading ? (
-                <p className="text-gray-400 text-sm">Завантаження...</p>
-              ) : materials.length === 0 ? (
-                <p className="text-gray-500 text-sm">Матеріалів ще немає.</p>
-              ) : (
-                materials.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-xs text-pink-600 font-medium">
-                        {materialTypeLabels[m.type] || m.type}
-                      </p>
-                      <a href={m.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-pink-600 underline text-sm break-all"
-                      >
-                        {m.title}
-                      </a>
-                    </div>
-                    <button
-                      onClick={() => deleteMaterial(m.id)}
-                      className="text-gray-400 hover:text-red-500 text-sm px-2"
-                    >
-                      Видалити
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Додати посилання (YouTube тощо)</p>
-              <input
-                type="text"
-                placeholder="Назва"
-                value={newLinkTitle}
-                onChange={(e) => setNewLinkTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-              <input
-                type="text"
-                placeholder="https://..."
-                value={newLinkUrl}
-                onChange={(e) => setNewLinkUrl(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-              <button
-                onClick={addLinkMaterial}
-                className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700"
-              >
-                Додати посилання
-              </button>
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Завантажити PDF або скріншот</p>
-              <input
-                type="file"
-                accept=".pdf,image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadFileMaterial(file);
-                }}
-                className="text-sm"
-              />
-              {uploading && <p className="text-gray-400 text-sm">Завантаження файлу...</p>}
-            </div>
-
-            <button
-              onClick={closePrep}
-              className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700"
-            >
-              Готово
-            </button>
-          </div>
-        </div>
+        />
       )}
     </div>
   );
