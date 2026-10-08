@@ -49,6 +49,9 @@ model Student {
   phone                 String?
   telegramUsername      String?
   telegramChatId        String?
+  // Куди надсилати посилання на урок: "TELEGRAM" або "VIBER"
+  contactChannel        String    @default("TELEGRAM")
+  viberPhone            String?
   englishLevel          EnglishLevel
   lessonFormat          LessonFormat
   defaultLessonDuration Int       // у хвилинах

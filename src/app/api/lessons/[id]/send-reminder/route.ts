@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendTelegramMessage, buildReminderMessage } from "@/lib/telegram";
+import { lessonMeetingLink } from "@/lib/lesson-link";
 
 export async function POST(
   _request: NextRequest,
@@ -41,7 +42,7 @@ export async function POST(
     studentFirstName: lesson.student.firstName,
     lessonDate,
     lessonTime,
-    meetingLink: lesson.meetingLink,
+    meetingLink: lessonMeetingLink(lesson.meetingLink),
   });
 
   const result = await sendTelegramMessage(lesson.student.telegramChatId, text);

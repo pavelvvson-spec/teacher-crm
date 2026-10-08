@@ -37,6 +37,8 @@ export default async function StudentDetailPage({
           lastName: student.lastName ?? "",
           phone: student.phone ?? "",
           telegramUsername: student.telegramUsername ?? "",
+          contactChannel: student.contactChannel,
+          viberPhone: student.viberPhone ?? "",
           englishLevel: student.englishLevel,
           lessonFormat: student.lessonFormat,
           defaultLessonDuration: student.defaultLessonDuration,

@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
       lastName: body.lastName || null,
       phone: body.phone || null,
       telegramUsername: body.telegramUsername || null,
+      contactChannel: body.contactChannel === "VIBER" ? "VIBER" : "TELEGRAM",
+      viberPhone: body.viberPhone || null,
       englishLevel: body.englishLevel,
       lessonFormat: body.lessonFormat,
       defaultLessonDuration: Number(body.defaultLessonDuration) || 60,

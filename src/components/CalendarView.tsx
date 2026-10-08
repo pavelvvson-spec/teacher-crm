@@ -17,6 +17,7 @@ import LessonForm from "@/components/LessonForm";
 import CalendarResetMenu from "@/components/CalendarResetMenu";
 import CopyPrepButton from "@/components/CopyPrepButton";
 import AiPrepButton from "@/components/AiPrepButton";
+import SendLinkButton from "@/components/SendLinkButton";
 
 type Student = {
   id: string;
@@ -719,6 +720,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
                   Зняти позначку «оплачено»
                 </button>
               )}
+              <SendLinkButton key={selectedLesson.id} lessonId={selectedLesson.id} />
               <button
                 onClick={() => sendReminder(selectedLesson)}
                 className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-medium hover:bg-purple-100"

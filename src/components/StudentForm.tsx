@@ -10,6 +10,8 @@ type StudentFormValues = {
   lastName: string;
   phone: string;
   telegramUsername: string;
+  contactChannel: string;
+  viberPhone: string;
   englishLevel: string;
   lessonFormat: string;
   defaultLessonDuration: number;
@@ -39,6 +41,8 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
     lastName: initialValues?.lastName ?? "",
     phone: initialValues?.phone ?? "",
     telegramUsername: initialValues?.telegramUsername ?? "",
+    contactChannel: initialValues?.contactChannel ?? "TELEGRAM",
+    viberPhone: initialValues?.viberPhone ?? "",
     englishLevel: initialValues?.englishLevel ?? "A1",
     lessonFormat: initialValues?.lessonFormat ?? "ONLINE",
     defaultLessonDuration: initialValues?.defaultLessonDuration ?? 60,
@@ -187,6 +191,26 @@ export default function StudentForm({ initialValues }: { initialValues?: Partial
             value={values.telegramUsername}
             onChange={(e) => setValues({ ...values, telegramUsername: e.target.value })}
             placeholder="@username"
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Куди надсилати посилання на урок</label>
+          <select
+            value={values.contactChannel}
+            onChange={(e) => setValues({ ...values, contactChannel: e.target.value })}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
+          >
+            <option value="TELEGRAM">Telegram</option>
+            <option value="VIBER">Viber</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Номер Viber</label>
+          <input
+            value={values.viberPhone}
+            onChange={(e) => setValues({ ...values, viberPhone: e.target.value })}
+            placeholder="Якщо порожньо — береться «Телефон»"
             className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400"
           />
         </div>
