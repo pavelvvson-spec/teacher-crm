@@ -9,6 +9,10 @@ import {
 } from "@/lib/telegram";
 import { checkAndMaybeSendSummary, settleStudentPeriodicPayments } from "@/lib/daily-checkup";
 import { calculateStudentBalance } from "@/lib/payments-utils";
+import { handleTeacherMessage, handleAssistantCallback } from "@/lib/teacher-assistant";
+
+// Відповідь ШІ-помічника може тривати до ~30 секунд
+export const maxDuration = 60;
 
 const HOMEWORK_BUTTON_TEXT = "📚 Отримати домашнє завдання";
 
@@ -81,6 +85,12 @@ async function recordLessonPayment(lesson: {
 }
 
 export async function POST(request: NextRequest) {
+  // Якщо задано TELEGRAM_WEBHOOK_SECRET, приймаємо лише запити від Telegram з цим секретом
+  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (secret && request.headers.get("x-telegram-bot-api-secret-token") !== secret) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => null);
 
   if (!body) {
@@ -103,6 +113,15 @@ export async function POST(request: NextRequest) {
 
   if (text === "/start_teacher") {
     const existingSettings = await prisma.settings.findFirst();
+
+    // Чат вчительки вже підключено — інший чат не може його перехопити
+    if (existingSettings?.teacherTelegramChatId && existingSettings.teacherTelegramChatId !== chatId) {
+      await sendTelegramMessage(
+        chatId,
+        `Чат вчительки вже підключено. Якщо потрібно підключити інший чат, спершу відключіть поточний у CRM: Telegram → «Відключити чат вчительки».`
+      );
+      return NextResponse.json({ ok: true });
+    }
 
     if (existingSettings) {
       await prisma.settings.update({
@@ -162,6 +181,24 @@ export async function POST(request: NextRequest) {
   if (text === HOMEWORK_BUTTON_TEXT || text === "/homework") {
     await handleHomeworkRequest(chatId);
     return NextResponse.json({ ok: true });
+  }
+
+  // ШІ-помічник: лише для чату вчительки
+  const settings = await prisma.settings.findFirst();
+  if (settings?.teacherTelegramChatId && settings.teacherTelegramChatId === chatId) {
+    if (text && !text.startsWith("/")) {
+      try {
+        await handleTeacherMessage(chatId, text, String(body.update_id ?? message.message_id));
+      } catch (e) {
+        console.error("Teacher assistant error", e);
+        await sendTelegramMessage(chatId, "⚠️ Сталася помилка. Спробуйте ще раз трохи пізніше.");
+      }
+    } else if (message.voice || message.audio) {
+      await sendTelegramMessage(
+        chatId,
+        "🎙️ Голосові я поки не розумію — це буде в наступній версії. Напишіть, будь ласка, текстом."
+      );
+    }
   }
 
   return NextResponse.json({ ok: true });
@@ -228,6 +265,18 @@ async function handleCallbackQuery(callbackQuery: {
 
   if (!data) {
     await answerTelegramCallbackQuery(callbackQuery.id);
+    return;
+  }
+
+  // Кнопки ШІ-помічника — лише з чату вчительки
+  if (data.startsWith("jdel:") || data.startsWith("prepsave:")) {
+    const settings = await prisma.settings.findFirst();
+    if (!chatId || settings?.teacherTelegramChatId !== chatId) {
+      await answerTelegramCallbackQuery(callbackQuery.id);
+      return;
+    }
+    const result = await handleAssistantCallback(data);
+    await answerTelegramCallbackQuery(callbackQuery.id, result.toast || undefined);
     return;
   }
 

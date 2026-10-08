@@ -227,3 +227,16 @@ model StudentJournalEntry {
 
   @@index([studentId, createdAt])
 }
+
+// Розмова вчительки з ШІ-помічником у Telegram (пам'ять останніх повідомлень)
+model AssistantMessage {
+  id               String   @id @default(cuid())
+  role             String   // "user" або "assistant"
+  content          String
+  studentId        String?
+  telegramUpdateId String?  @unique
+  data             Json?
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+}

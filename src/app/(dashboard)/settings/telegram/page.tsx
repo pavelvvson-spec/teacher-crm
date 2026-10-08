@@ -34,15 +34,36 @@ export default async function TelegramSettingsPage() {
         </div>
         <div className="pt-2">
           {settings?.teacherTelegramChatId ? (
-            <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-lg">
-              Підключено
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded-lg">
+                Підключено
+              </span>
+              <form action="/api/telegram/unlink-teacher" method="post">
+                <button type="submit" className="text-xs text-gray-500 hover:text-red-600 underline">
+                  Відключити чат вчительки
+                </button>
+              </form>
+            </div>
           ) : (
             <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-lg">
               Не підключено
             </span>
           )}
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+        <h2 className="text-lg font-semibold text-gray-800">✨ ШІ-помічник у Telegram</h2>
+        <p className="text-gray-600 text-sm">
+          У чаті вчительки можна просто писати боту, як колезі. Помічник відповідає лише в цьому чаті —
+          учні й сторонні його не бачать.
+        </p>
+        <ul className="text-gray-600 text-sm list-disc pl-5 space-y-1">
+          <li>«Маша сьогодні нарешті заговорила, але плутає has/have» — запише в журнал Маші.</li>
+          <li>«Що робити з Ліною, їй нудно на уроках?» — порадить з урахуванням журналу й портрета.</li>
+          <li>«Підготуй урок із Сонею» — складе план на найближчий урок, його можна зберегти в урок.</li>
+          <li>Будь-яке методичне питання без конкретного учня.</li>
+        </ul>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">

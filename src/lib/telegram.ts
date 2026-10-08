@@ -184,3 +184,51 @@ export function buildReminderMessage(params: {
   text += `\n\nЯкщо потрібно перенести заняття, напишіть викладачу.`;
   return text;
 }
+
+// Екранує текст для parse_mode HTML (відповіді ШІ можуть містити < > &)
+export function escapeTelegramHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Показує «друкує...» у чаті, поки ШІ готує відповідь
+export async function sendTelegramTyping(chatId: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+  try {
+    await fetch(`${TELEGRAM_API}${token}/sendChatAction`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action: "typing" }),
+    });
+  } catch {
+    // не критично
+  }
+}
+
+// Надсилає довгий текст частинами (ліміт Telegram — 4096 символів).
+// Кнопки (якщо є) додаються до останньої частини. Текст — звичайний (НЕ HTML), екранується тут.
+export async function sendLongTelegramMessage(
+  chatId: string,
+  text: string,
+  buttonRows?: TelegramInlineButton[][]
+): Promise<void> {
+  const LIMIT = 3800;
+  const parts: string[] = [];
+  let rest = text;
+  while (rest.length > LIMIT) {
+    let cut = rest.lastIndexOf("\n", LIMIT);
+    if (cut < LIMIT / 2) cut = LIMIT;
+    parts.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^\n+/, "");
+  }
+  parts.push(rest);
+
+  for (let i = 0; i < parts.length; i++) {
+    const isLast = i === parts.length - 1;
+    if (isLast && buttonRows && buttonRows.length > 0) {
+      await sendTelegramMessageWithButtons(chatId, escapeTelegramHtml(parts[i]), buttonRows);
+    } else {
+      await sendTelegramMessage(chatId, escapeTelegramHtml(parts[i]));
+    }
+  }
+}
