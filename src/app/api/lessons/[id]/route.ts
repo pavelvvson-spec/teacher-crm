@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson } from "@/lib/lesson-conflict";
 import { syncCalendarSafely } from "@/lib/google-calendar";
+import { advanceTextbookAfterLesson } from "@/lib/textbook";
 
 // Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
 export const maxDuration = 60;
@@ -26,6 +27,12 @@ export async function PUT(
   if (body.cancellationReason !== undefined) data.cancellationReason = body.cancellationReason || null;
   if (body.meetingLink !== undefined) data.meetingLink = body.meetingLink || null;
   if (body.price !== undefined) data.price = Number(body.price);
+  if (body.textbookFrom !== undefined) {
+    const from = Number(body.textbookFrom) || null;
+    const to = Number(body.textbookTo) || from;
+    data.textbookFrom = from;
+    data.textbookTo = from && to ? Math.max(from, to) : null;
+  }
 
   if (body.startAt !== undefined) {
     const existing = await prisma.lesson.findUnique({ where: { id } });
@@ -62,6 +69,8 @@ export async function PUT(
     where: { id },
     data,
   });
+
+  if (body.status === "COMPLETED" && !body.noShow) await advanceTextbookAfterLesson(id);
 
   await syncCalendarSafely();
   return NextResponse.json(lesson);

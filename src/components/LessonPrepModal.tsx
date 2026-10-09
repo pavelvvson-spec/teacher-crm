@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatTime } from "@/lib/calendar-utils";
 import CopyPrepButton from "@/components/CopyPrepButton";
 import AiPrepButton from "@/components/AiPrepButton";
+import TextbookPagesRow from "@/components/TextbookPagesRow";
 
 export type PrepMaterial = { id: string; type: string; title: string; url: string };
 
@@ -248,6 +249,10 @@ export default function LessonPrepModal({
           ) : (
             <CopyPrepButton lessonId={lesson.id} onCopied={handleCopied} />
           )}
+
+          <TextbookPagesRow
+            url={isDraft ? `/api/students/${draftStudentId}/draft/textbook` : `/api/lessons/${lesson.id}/textbook`}
+          />
 
           <AiPrepButton
             lessonId={lesson.id}

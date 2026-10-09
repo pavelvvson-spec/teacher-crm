@@ -6,6 +6,7 @@ import StudentJournal from "@/components/StudentJournal";
 import StudentActionsMenu from "@/components/StudentActionsMenu";
 import { studentWord } from "@/lib/gender";
 import StudentDraftBlock from "@/components/StudentDraftBlock";
+import StudentTextbookBlock from "@/components/StudentTextbookBlock";
 import { draftHasContent } from "@/lib/lesson-draft";
 import { getStudentNumber } from "@/lib/student-number";
 
@@ -28,6 +29,10 @@ export default async function StudentDetailPage({
   }
 
   const studentNumber = await getStudentNumber(id);
+  const books = await prisma.textbook.findMany({
+    orderBy: { title: "asc" },
+    select: { id: true, title: true, level: true, pageCount: true },
+  });
   const hasFutureLesson =
     (await prisma.lesson.count({
       where: { studentId: id, startAt: { gt: new Date() }, status: { in: ["SCHEDULED", "RESCHEDULED"] } },
@@ -82,6 +87,13 @@ export default async function StudentDetailPage({
       {/* На телефоні спершу журнал і графік (щоденне), потім анкета; на комп'ютері — дві колонки */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div className="space-y-4 lg:order-2">
+          <StudentTextbookBlock
+            studentId={student.id}
+            books={books}
+            initialTextbookId={student.textbookId}
+            initialPage={student.textbookPage}
+            studentLevel={student.englishLevel}
+          />
           {student.isActive && (
             <StudentDraftBlock studentId={student.id} draft={draft} hasFutureLesson={hasFutureLesson} />
           )}

@@ -87,7 +87,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   await prisma.lessonMaterial.deleteMany({ where: { draftStudentId: id } });
   await prisma.student.update({
     where: { id },
-    data: { draftNotes: null, draftHomework: null, draftUpdatedAt: null },
+    data: { draftNotes: null, draftHomework: null, draftUpdatedAt: null, draftTextbookFrom: null, draftTextbookTo: null },
   });
   return NextResponse.json({ ok: true });
 }

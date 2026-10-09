@@ -1,7 +1,8 @@
 // Генерація плану уроку з ШІ — спільна логіка для кнопки в CRM і Telegram-помічника.
 import { prisma } from "@/lib/prisma";
-import { callClaude, journalToText } from "@/lib/anthropic";
+import { callClaude, journalToText, type ClaudeContentBlock } from "@/lib/anthropic";
 import { methodContext, ageInfo } from "@/lib/pedagogy";
+import { textbookForPrep } from "@/lib/textbook";
 
 const STATUS_UA: Record<string, string> = {
   SCHEDULED: "заплановано",
@@ -28,6 +29,7 @@ const SYSTEM_PROMPT = `Ти — досвідчений методист з ан�
 Спирайся ЛИШЕ на дані про учня, що тобі дали: портрет учня, журнал вчительки, нотатки до уроків. Журнал і портрет — найцінніше джерело: враховуй інтереси, слабкі місця і те, що працює з цим учнем. Якщо даних мало (немає нотаток про попередні уроки) — скажи про це одним реченням і склади універсальний план під рівень учня, нічого не вигадуючи про його минулі помилки чи теми.
 Враховуй тривалість уроку: таймінг блоків має сходитися з нею.
 Будь конкретним: готові питання, речення, слова, а не загальні поради.
+Якщо дано сторінки підручника — будуй урок навколо них: які вправи робити (номер вправи і сторінка), що пропустити, що додати від себе під цього учня; ДЗ — бажано з цих сторінок або робочого зошита до них. Не вигадуй вправ, яких немає на сторінках, — пиши «додатково» для власних.
 
 Відповідай СТРОГО одним JSON-об'єктом без markdown і без тексту навколо:
 {
@@ -109,7 +111,16 @@ ${historyText}
 ПОБАЖАННЯ ВЧИТЕЛЬКИ ДО ЦЬОГО УРОКУ
 ${wish || "немає"}`;
 
-  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), userPrompt, 3000);
+  const tb = await textbookForPrep(lesson.studentId, { from: lesson.textbookFrom, to: lesson.textbookTo });
+  // Якщо сторінки були лише запропоновані — запам'ятовуємо їх за уроком (щоб після уроку учень «перейшов» далі)
+  if (tb.range && !lesson.textbookFrom) {
+    await prisma.lesson.update({ where: { id }, data: { textbookFrom: tb.range.from, textbookTo: tb.range.to } });
+  }
+  const content: ClaudeContentBlock[] | string = tb.text
+    ? [{ type: "text", text: `${userPrompt}\n\n${tb.text}` }, ...tb.blocks]
+    : userPrompt;
+
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), content, 3000);
   if (!result.ok) {
     return { ok: false, error: result.error };
   }
@@ -190,7 +201,18 @@ ${historyText}
 ПОБАЖАННЯ ВЧИТЕЛЬКИ
 ${wish || "немає"}`;
 
-  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), userPrompt, 3000);
+  const tb = await textbookForPrep(studentId, { from: s.draftTextbookFrom, to: s.draftTextbookTo });
+  if (tb.range && !s.draftTextbookFrom) {
+    await prisma.student.update({
+      where: { id: studentId },
+      data: { draftTextbookFrom: tb.range.from, draftTextbookTo: tb.range.to },
+    });
+  }
+  const content: ClaudeContentBlock[] | string = tb.text
+    ? [{ type: "text", text: `${userPrompt}\n\n${tb.text}` }, ...tb.blocks]
+    : userPrompt;
+
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), content, 3000);
   if (!result.ok) return { ok: false, error: result.error };
   const text = result.text;
   let plan = text;

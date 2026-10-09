@@ -177,7 +177,8 @@ export default function CalendarView({ students }: { students: Student[] }) {
       const teacherNotes = lesson.teacherNotes
         ? `${lesson.teacherNotes}\n${noteLine}`
         : noteLine;
-      await updateLessonFields(lesson, { status: "COMPLETED", teacherNotes });
+      // noShow — щоб сторінка підручника учня не «просувалась» (уроку фактично не було)
+      await updateLessonFields(lesson, { status: "COMPLETED", teacherNotes, noShow: "1" });
     } else {
       await updateLessonFields(lesson, { status: "NO_SHOW" });
     }

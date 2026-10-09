@@ -11,13 +11,21 @@ export function draftHasContent(s: { draftNotes: string | null; draftHomework: s
 export async function moveDraftToLesson(studentId: string, lessonId: string): Promise<boolean> {
   const student = await prisma.student.findUnique({
     where: { id: studentId },
-    select: { draftNotes: true, draftHomework: true, _count: { select: { draftMaterials: true } } },
+    select: {
+      draftNotes: true,
+      draftHomework: true,
+      draftTextbookFrom: true,
+      draftTextbookTo: true,
+      _count: { select: { draftMaterials: true } },
+    },
   });
-  if (!student || !draftHasContent(student, student._count.draftMaterials)) return false;
+  if (!student) return false;
+  const hasContent = draftHasContent(student, student._count.draftMaterials);
+  if (!hasContent && !student.draftTextbookFrom) return false;
 
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    select: { teacherNotes: true, homework: true },
+    select: { teacherNotes: true, homework: true, textbookFrom: true },
   });
   if (!lesson) return false;
 
@@ -35,6 +43,9 @@ export async function moveDraftToLesson(studentId: string, lessonId: string): Pr
       data: {
         teacherNotes: join(lesson.teacherNotes, student.draftNotes),
         homework: join(lesson.homework, student.draftHomework),
+        ...(student.draftTextbookFrom && !lesson.textbookFrom
+          ? { textbookFrom: student.draftTextbookFrom, textbookTo: student.draftTextbookTo }
+          : {}),
       },
     });
     await tx.lessonMaterial.updateMany({
@@ -43,10 +54,16 @@ export async function moveDraftToLesson(studentId: string, lessonId: string): Pr
     });
     await tx.student.update({
       where: { id: studentId },
-      data: { draftNotes: null, draftHomework: null, draftUpdatedAt: null },
+      data: {
+        draftNotes: null,
+        draftHomework: null,
+        draftUpdatedAt: null,
+        draftTextbookFrom: null,
+        draftTextbookTo: null,
+      },
     });
   });
-  return true;
+  return hasContent;
 }
 
 // Найближчий запланований урок учня (якщо є — готуємо його, а не чернетку)

@@ -83,6 +83,36 @@ model Student {
   draftHomework       String?
   draftUpdatedAt      DateTime?
   draftMaterials      LessonMaterial[] @relation("DraftMaterials")
+  // Сторінки підручника для чернетки наступного уроку (друковані номери)
+  draftTextbookFrom   Int?
+  draftTextbookTo     Int?
+
+  // Підручник, за яким іде навчання, і сторінка, на якій учень зараз (друкований номер)
+  textbookId          String?
+  textbook            Textbook? @relation(fields: [textbookId], references: [id], onDelete: SetNull)
+  textbookPage        Int?
+}
+
+// Підручник з бібліотеки вчительки. PDF зберігається частинами по chunkSize сторінок у Vercel Blob,
+// щоб ШІ міг швидко брати лише потрібні сторінки.
+model Textbook {
+  id         String   @id @default(cuid())
+  title      String
+  level      String?  // A1…C2 або діапазон, як визначив ШІ / вчителька
+  summary    String?  // коротко, що це за книжка (для ШІ)
+  contents   String?  // зміст юнітів зі сторінками (для ШІ)
+  pageCount  Int
+  chunkSize  Int      @default(10)
+  chunkUrls  String[]
+  // Номер сторінки в PDF = друкований номер + pageOffset
+  pageOffset Int      @default(0)
+  fileName   String?
+  fileSize   Int      @default(0)
+  analyzedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  students   Student[]
 }
 
 enum LessonStatus {
@@ -121,6 +151,9 @@ model Lesson {
   originalStartAt    DateTime?
   // Коли вчительці надіслано повідомлення «урок закінчився / перерва»
   endNotifiedAt      DateTime?
+  // Сторінки підручника на цей урок (друковані номери)
+  textbookFrom       Int?
+  textbookTo         Int?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 

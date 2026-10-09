@@ -6,7 +6,8 @@ export type ClaudeResult = { ok: true; text: string } | { ok: false; error: stri
 // Блок повідомлення: текст або картинка (base64)
 export type ClaudeContentBlock =
   | { type: "text"; text: string }
-  | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+  | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string }; title?: string };
 
 export async function callClaude(
   system: string,

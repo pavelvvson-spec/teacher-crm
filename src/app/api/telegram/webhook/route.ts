@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { noShowPaidNote } from "@/lib/gender";
 import { prisma } from "@/lib/prisma";
+import { advanceTextbookAfterLesson } from "@/lib/textbook";
 import {
   sendTelegramMessage,
   sendTelegramMessageWithButtons,
@@ -392,6 +393,7 @@ async function handleCallbackQuery(callbackQuery: {
       where: { id: lessonId },
       data: updateData,
     });
+    if (updateData.status === "COMPLETED") await advanceTextbookAfterLesson(lessonId);
 
     // «Оплачено» створює окрему оплату з датою, лише якщо урок ще не покритий
     if (code === "1") {

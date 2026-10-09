@@ -6,11 +6,12 @@ import { isFirefliesConfigured } from "@/lib/fireflies";
 import MethodologyPanel from "@/components/MethodologyPanel";
 import BreakNotificationsPanel from "@/components/BreakNotificationsPanel";
 import DemoModeToggle from "@/components/DemoModeToggle";
+import TextbooksPanel from "@/components/TextbooksPanel";
 import { isDemoRequest, demoDbConfigured } from "@/lib/demo-mode";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "method" | "telegram" | "connections";
+type Tab = "method" | "books" | "telegram" | "connections";
 
 function StatusChip({ ok, okText = "Працює", badText = "Не налаштовано" }: { ok: boolean; okText?: string; badText?: string }) {
   return ok ? (
@@ -28,7 +29,7 @@ export default async function SettingsPage({
   const { tab: tabParam, calOk, calError, ffOk, ffError } = await searchParams;
   // Після «Синхронізувати» / «Перевірити записи» повертаємось на вкладку «Підключення»
   const tab: Tab =
-    tabParam === "telegram" || tabParam === "connections" || tabParam === "method"
+    tabParam === "telegram" || tabParam === "connections" || tabParam === "method" || tabParam === "books"
       ? tabParam
       : calOk || calError || ffOk || ffError
         ? "connections"
@@ -45,6 +46,7 @@ export default async function SettingsPage({
 
   const TABS: { key: Tab; label: string }[] = [
     { key: "method", label: "Методика" },
+    { key: "books", label: "Підручники" },
     { key: "telegram", label: "Telegram" },
     { key: "connections", label: "Підключення" },
   ];
@@ -53,12 +55,12 @@ export default async function SettingsPage({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-800">Налаштування</h1>
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 max-w-full overflow-x-auto">
           {TABS.map((t) => (
             <Link
               key={t.key}
               href={`/settings/telegram?tab=${t.key}`}
-              className={`px-3 sm:px-4 py-1.5 rounded-lg text-sm font-medium ${
+              className={`px-2.5 sm:px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap ${
                 tab === t.key ? "bg-white text-pink-700 shadow-sm" : "text-gray-600 hover:text-gray-800"
               }`}
             >
@@ -69,6 +71,8 @@ export default async function SettingsPage({
       </div>
 
       {tab === "method" && <MethodologyPanel />}
+
+      {tab === "books" && <TextbooksPanel />}
 
       {tab === "telegram" && (
         <>
