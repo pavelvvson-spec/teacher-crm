@@ -7,6 +7,7 @@ import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
 import PaymentsList, { type PaymentKind, type PaymentRow } from "@/components/PaymentsList";
 import FinanceTabs from "@/components/FinanceTabs";
 import InfoTip from "@/components/InfoTip";
+import { computeMoneyCheck } from "@/lib/money-check";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,15 @@ export default async function PaymentsPage() {
   const monthIncome =
     monthFlagLessons.reduce((s, l) => s + l.price, 0) + monthPayments.reduce((s, p) => s + p.amount, 0);
 
+  // Неточності в даних (лише «червоні») — показуємо рядок-попередження, якщо щось знайдено
+  let warnCount = 0;
+  try {
+    const check = await computeMoneyCheck();
+    warnCount = check.students.reduce((n, st) => n + st.findings.filter((f) => f.level === "warn").length, 0);
+  } catch (e) {
+    console.error("money check error", e);
+  }
+
   const monthName = new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", month: "long" }).format(now);
 
   return (
@@ -147,14 +157,14 @@ export default async function PaymentsPage() {
       <FinanceTabs
         active="students"
         actions={
-          <div className="flex items-center gap-1">
-            <MoneyCheckButton />
-            <PaymentsMoreMenu>
-              <ResetPaymentsButton />
-            </PaymentsMoreMenu>
-          </div>
+          <PaymentsMoreMenu>
+            <MoneyCheckButton variant="menu" />
+            <ResetPaymentsButton />
+          </PaymentsMoreMenu>
         }
       />
+
+      {warnCount > 0 && <MoneyCheckButton variant="banner" warnCount={warnCount} />}
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-5">

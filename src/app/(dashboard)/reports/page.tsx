@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { allocatePayments } from "@/lib/payments-utils";
 import FinanceTabs from "@/components/FinanceTabs";
 import InfoTip from "@/components/InfoTip";
+import FinanceTable from "@/components/FinanceTable";
 import Link from "next/link";
 import { kyivWallTimeToUtc } from "@/lib/kyiv-time";
 
@@ -285,35 +286,7 @@ export default async function ReportsPage({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-5">
-        <h2 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-1.5">
-          Хто скільки заплатив
-          <InfoTip
-            title="Хто скільки заплатив"
-            text="Скільки грошей заплатив кожен учень за цей період. Разом це дорівнює сумі «Отримано»."
-          />
-        </h2>
-        {perStudent.length === 0 ? (
-          <p className="text-gray-500 text-sm">За цей період оплат ще не було.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {perStudent.map((s) => (
-              <li key={s.id} className="py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-800 truncate">{s.name}</span>
-                  <span className="font-semibold text-gray-800 whitespace-nowrap">{uah(s.total)}</span>
-                </div>
-                <div className="mt-1 h-1 rounded-full bg-gray-100 overflow-hidden">
-                  <div
-                    className="h-full bg-green-400"
-                    style={{ width: `${maxPerStudent > 0 ? Math.round((s.total / maxPerStudent) * 100) : 0}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <FinanceTable />
     </div>
   );
 }
