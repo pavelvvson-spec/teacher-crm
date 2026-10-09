@@ -67,6 +67,57 @@ function parseJson<T>(text: string): T | null {
   }
 }
 
+type Analysis = {
+  title?: string;
+  level?: string | null;
+  summary?: string;
+  contents?: string;
+  samplePrinted?: (number | null)[];
+};
+
+// Витягує рядкове поле JSON навіть з обірваної відповіді.
+// allowCut — якщо рядок обірвався (довгий зміст), повертає все до останнього повного рядка.
+function looseString(text: string, key: string, allowCut = false): string | undefined {
+  const m = new RegExp(`"${key}"\\s*:\\s*"`).exec(text);
+  if (!m) return undefined;
+  let i = m.index + m[0].length;
+  let out = "";
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === "\\") {
+      const nx = text[i + 1];
+      out += nx === "n" ? "\n" : nx === "t" ? " " : (nx ?? "");
+      i += 2;
+      continue;
+    }
+    if (ch === '"') return out;
+    out += ch;
+    i++;
+  }
+  if (!allowCut) return undefined;
+  const cut = out.lastIndexOf("\n");
+  return cut > 0 ? out.slice(0, cut) : out;
+}
+
+// Розбір відповіді ШІ з запасом міцності: довгий зміст іноді обрізається
+// або містить «сирі» переноси рядків — тоді витягуємо поля по одному.
+function parseAnalysis(text: string): Analysis | null {
+  const strict = parseJson<Analysis>(text);
+  if (strict) return strict;
+  const level = /"level"\s*:\s*"([^"]*)"/.exec(text)?.[1] ?? null;
+  const sp = /"samplePrinted"\s*:\s*\[\s*(null|\d+)\s*,\s*(null|\d+)\s*\]/.exec(text);
+  const result: Analysis = {
+    title: looseString(text, "title"),
+    level,
+    summary: looseString(text, "summary"),
+    contents: looseString(text, "contents", true),
+    samplePrinted: sp
+      ? [sp[1] === "null" ? null : Number(sp[1]), sp[2] === "null" ? null : Number(sp[2])]
+      : undefined,
+  };
+  return result.title || result.level || result.contents ? result : null;
+}
+
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
 
 // ШІ дивиться перші сторінки (обкладинка, зміст) і пару сторінок із середини,
@@ -98,30 +149,27 @@ export async function analyzeTextbook(id: string): Promise<{ ok: true } | { ok: 
   blocks.push({
     type: "text",
     text: `Це підручник англійської мови (всього ${tb.pageCount} сторінок у PDF, файл «${tb.fileName ?? tb.title}»).
-Визнач і відповідай СТРОГО одним JSON без markdown:
+Визнач і відповідай СТРОГО одним JSON без markdown. Поля саме в такому порядку, "contents" — останнім:
 {
   "title": "назва підручника як на обкладинці (серія, рівень, Student's Book / Workbook)",
-  "level": "один рівень CEFR: A1, A2, B1, B2, C1 або C2 (якщо вказано Pre-intermediate — A2, Intermediate — B1, Upper-intermediate — B2, Advanced — C1, Elementary — A1/A2 на твій розсуд); null, якщо неможливо",
-  "summary": "1–2 речення українською: що це за книжка, для кого (діти/підлітки/дорослі), підхід",
-  "contents": "зміст: кожен юніт з нового рядка у форматі 'Unit 1 — назва — граматика/лексика — стор. 6'. Номери сторінок — ДРУКОВАНІ, як у змісті. Якщо змісту не видно — порожній рядок",
-  "samplePrinted": [друкований номер на першій сторінці документа 3 або null, друкований номер на другій або null]
+  "level": "один рівень CEFR: A1, A2, B1, B2, C1 або C2 (Elementary — A1/A2, Pre-intermediate — A2, Intermediate — B1, Upper-intermediate — B2, Advanced — C1); null, якщо неможливо",
+  "summary": "1–2 речення українською: що це за книжка, для кого (діти/підлітки/дорослі), як побудована (наприклад: кожен юніт — розворот із 2 сторінок: зліва пояснення, справа вправи)",
+  "samplePrinted": [друкований номер на першій сторінці документа 3 або null, друкований номер на другій або null],
+  "contents": "стислий зміст, кожен юніт з нового рядка: 'U1 Present continuous — 2'. Число в кінці — ДРУКОВАНА сторінка початку юніта; якщо в змісті сторінок немає, а юніти йдуть розворотами по 2 сторінки — порахуй її. Лише рядки змісту, без пояснень. Якщо змісту не видно — порожній рядок"
 }`,
   });
 
   const result = await callClaude(
     "Ти уважно читаєш сторінки підручників англійської мови і витягаєш з них факти. Нічого не вигадуй.",
     blocks,
-    3000
+    8000
   );
   if (!result.ok) return { ok: false, error: result.error };
-  const parsed = parseJson<{
-    title?: string;
-    level?: string | null;
-    summary?: string;
-    contents?: string;
-    samplePrinted?: (number | null)[];
-  }>(result.text);
-  if (!parsed) return { ok: false, error: "ШІ відповів незрозуміло — спробуйте ще раз" };
+  const parsed = parseAnalysis(result.text);
+  if (!parsed) {
+    console.error("textbook analyze: unparsable", result.text.slice(0, 2000));
+    return { ok: false, error: "ШІ відповів незрозуміло — спробуйте ще раз" };
+  }
 
   let pageOffset = tb.pageOffset;
   const sp = parsed.samplePrinted ?? [];

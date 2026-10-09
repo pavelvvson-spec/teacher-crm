@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeTextbook } from "@/lib/textbook";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // ШІ читає обкладинку, зміст і пару сторінок — визначає назву, рівень, зміст і нумерацію
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
