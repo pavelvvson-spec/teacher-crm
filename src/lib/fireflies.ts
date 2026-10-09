@@ -14,7 +14,24 @@ import { addObservations } from "@/lib/methodology";
 import { sendLongTelegramMessage, sendTelegramHtmlMessage, escapeTelegramHtml } from "@/lib/telegram";
 
 const API = "https://api.fireflies.ai/graphql";
-const TEACHER_NAME_HINTS = ["олександра", "oleksandra", "aleksandra", "саша", "sasha", "tokarchuk", "васютинськ"];
+const TEACHER_NAME_HINTS = [
+  "олександра",
+  "oleksandra",
+  "aleksandra",
+  "alexandra",
+  "alexandr",
+  "саша",
+  "sasha",
+  "sacha",
+  "tokarchuk",
+  "васютинськ",
+  "vasiutynsk",
+  "vasyutynsk",
+  ...(process.env.TEACHER_SPEAKER_NAMES || "")
+    .split(",")
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean),
+];
 
 export function isFirefliesConfigured() {
   return Boolean(process.env.FIREFLIES_API_KEY);
@@ -156,17 +173,33 @@ function talkShares(t: Transcript): { teacherPct: number; studentPct: number } |
     else student += dur;
   }
   const total = teacher + student;
-  if (total <= 0) return null;
+  // Якщо вчительку серед мовців не впізнано — частка ненадійна (вийшло б «учень 100%»)
+  if (total <= 0 || teacher === 0) return null;
   const studentPct = Math.round((student / total) * 100);
   return { studentPct, teacherPct: 100 - studentPct };
+}
+
+// Імена мовців у записі (щоб підказати, якщо вчительку не впізнано)
+function speakerNames(t: Transcript): string[] {
+  return [...new Set((t.sentences ?? []).map((s) => (s.speaker_name ?? "").trim()).filter(Boolean))];
+}
+
+function teacherRecognized(t: Transcript): boolean {
+  return (t.sentences ?? []).some((s) => isTeacher(s.speaker_name));
 }
 
 function transcriptToText(t: Transcript, maxChars = 45000): string {
   const lines: string[] = [];
   let total = 0;
+  const known = teacherRecognized(t);
   for (const s of t.sentences ?? []) {
     if (!s.text) continue;
-    const who = isTeacher(s.speaker_name) ? "Вчителька" : `Учень (${s.speaker_name ?? "?"})`;
+    // Якщо вчительку не впізнано за іменем — даємо ШІ сирі імена мовців, хай визначить сам за змістом
+    const who = known
+      ? isTeacher(s.speaker_name)
+        ? "Вчителька"
+        : `Учень (${s.speaker_name ?? "?"})`
+      : `Мовець «${s.speaker_name ?? "?"}»`;
     const line = `${who}: ${s.text}`;
     if (total + line.length > maxChars) {
       lines.push("…(далі текст обрізано)");
@@ -176,6 +209,65 @@ function transcriptToText(t: Transcript, maxChars = 45000): string {
     total += line.length;
   }
   return lines.join("\n");
+}
+
+// Розбирає відповідь ШІ навіть якщо JSON обрізаний або зіпсований:
+// спершу пробуємо повний JSON, інакше витягуємо поля по одному.
+function parseAnalysisLoose(text: string): Record<string, unknown> | null {
+  const st = text.indexOf("{");
+  const en = text.lastIndexOf("}");
+  if (st !== -1 && en > st) {
+    try {
+      return JSON.parse(text.slice(st, en + 1));
+    } catch {
+      // нижче — порятунок по полях
+    }
+  }
+  if (st === -1) return null;
+  const body = text.slice(st);
+  const STR = /"((?:[^"\\]|\\.)*)"/g;
+  const unescape = (x: string) => {
+    try {
+      return JSON.parse(`"${x}"`) as string;
+    } catch {
+      return x;
+    }
+  };
+  const arrayOf = (key: string): string[] => {
+    const m = new RegExp(`"${key}"\\s*:\\s*\\[`).exec(body);
+    if (!m) return [];
+    let rest = body.slice(m.index + m[0].length);
+    const close = rest.search(/\]/);
+    if (close !== -1) rest = rest.slice(0, close);
+    const out: string[] = [];
+    for (const mm of rest.matchAll(STR)) out.push(unescape(mm[1]));
+    return out;
+  };
+  const strOf = (key: string): string => {
+    const m = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(body);
+    return m ? unescape(m[1]) : "";
+  };
+  const pct = /"student_pct"\s*:\s*(\d{1,3})/.exec(body);
+  const errors: { wrong: string; right: string }[] = [];
+  for (const mm of body.matchAll(/"wrong"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"right"\s*:\s*"((?:[^"\\]|\\.)*)"/g)) {
+    errors.push({ wrong: unescape(mm[1]), right: unescape(mm[2]) });
+  }
+  const res: Record<string, unknown> = {
+    topics: arrayOf("topics"),
+    went_well: arrayOf("went_well"),
+    difficulties: arrayOf("difficulties"),
+    homework: arrayOf("homework"),
+    next_focus: arrayOf("next_focus"),
+    method_observations: arrayOf("method_observations"),
+    errors,
+    errors_note: strOf("errors_note"),
+    advice: strOf("advice"),
+  };
+  if (pct) res.student_pct = Number(pct[1]);
+  const any = ["topics", "went_well", "difficulties", "homework", "next_focus"].some(
+    (k) => (res[k] as string[]).length > 0
+  );
+  return any ? res : null;
 }
 
 const SUMMARY_PROMPT = `Ти — асистент вчительки англійської і досвідчений методист. Тобі дають автоматичний транскрипт індивідуального онлайн-уроку (розпізнавання мови неточне, особливо дитячих коротких відповідей і суміші української з англійською).
@@ -231,8 +323,13 @@ export async function processFirefliesMeeting(meetingId: string, notify = true):
   });
 
   const shares = talkShares(t);
+  const recognized = teacherRecognized(t);
   const input = `ПРИБЛИЗНА ЧАСТКА МОВЛЕННЯ УЧНЯ (автоматично): ${shares ? `${shares.studentPct}%` : "невідомо"}
-
+${
+  recognized
+    ? ""
+    : "УВАГА: у транскрипті мовців не підписано як «Вчителька»/«Учень». Визнач сам за змістом, хто вчителька (пояснює, ставить запитання, хвалить), а хто учень. Якщо розділити мовців неможливо — student_pct: null.\n"
+}
 УЧЕНЬ: ${name}, вік ${ageInfo(lesson.student)}, рівень ${lesson.student.englishLevel}
 Нотатки про учня: ${lesson.student.notes || "немає"}
 УРОК: ${dateLabel}, ${Math.round(Number(t.duration ?? 0))} хв
@@ -241,7 +338,7 @@ export async function processFirefliesMeeting(meetingId: string, notify = true):
 ТРАНСКРИПТ
 ${transcriptToText(t)}`;
 
-  const ai = await callClaude(SUMMARY_PROMPT + (await methodContext()), input, 2200);
+  const ai = await callClaude(SUMMARY_PROMPT + (await methodContext()), input, 5000);
   if (!ai.ok) {
     if (notify) await notifyTeacher(`⚠️ Не вдалося обробити запис уроку з ${name}: ${ai.error}`);
     return { status: "skipped", reason: ai.error };
@@ -259,16 +356,7 @@ ${transcriptToText(t)}`;
     advice?: string;
     method_observations?: string[];
   };
-  let parsed: Analysis | null = null;
-  const st = ai.text.indexOf("{");
-  const en = ai.text.lastIndexOf("}");
-  if (st !== -1 && en > st) {
-    try {
-      parsed = JSON.parse(ai.text.slice(st, en + 1));
-    } catch {
-      parsed = null;
-    }
-  }
+  const parsed: Analysis | null = parseAnalysisLoose(ai.text) as Analysis | null;
   const list = (v: unknown): string[] =>
     (Array.isArray(v) ? v : typeof v === "string" ? [v] : [])
       .map((x) => String(x).replace(/^\s*(?:[•\-–*]|\d+[.)])\s*/, "").trim())
@@ -282,9 +370,12 @@ ${transcriptToText(t)}`;
     { emoji: "🎯", title: "Наступного разу", items: list(parsed?.next_focus) },
   ].filter((x) => x.items.length > 0);
   // Звичайний текст — для журналу (і запасний варіант, якщо ШІ повернув не JSON)
+  const rawLooksLikeJson = ai.text.trim().startsWith("{") || ai.text.includes('"topics"');
   const summary = sections.length
     ? sections.map((x) => `${x.title}: ${x.items.join("; ")}`).join("\n")
-    : ai.text.trim();
+    : rawLooksLikeJson
+      ? "Конспект не вдалося розібрати автоматично."
+      : ai.text.trim();
   const studentPctRaw = Number(parsed?.student_pct);
   const studentPct =
     Number.isFinite(studentPctRaw) && studentPctRaw >= 0 && studentPctRaw <= 100
@@ -366,6 +457,12 @@ ${transcriptToText(t)}`;
       review.push(`❌ <b>Помилки учня</b>\n<i>${h(errorsNote)}</i>`);
     }
     if (advice) review.push(`💡 <b>Порада</b>\n${h(advice)}`);
+    if (!recognized) {
+      const names = speakerNames(t).slice(0, 4);
+      review.push(
+        `ℹ️ <i>Не впізнала тебе серед мовців у записі${names.length ? ` (${h(names.join(", "))})` : ""} — частку мовлення оцінено приблизно.</i>`
+      );
+    }
     if (review.length) {
       blocks.push(`━━━━━━━━━━━━\n📊 <b>ДЛЯ ТЕБЕ</b>`);
       blocks.push(...review);
