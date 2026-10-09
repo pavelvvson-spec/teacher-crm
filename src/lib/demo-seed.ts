@@ -395,5 +395,51 @@ export async function seedDemo(db: PrismaClient): Promise<{ students: number; le
     },
   });
 
+  // 8) Підручник: якщо в демо-бібліотеку вже завантажено книжку (Налаштування → Підручники в демо-режимі),
+  //    прив'язуємо її до трьох учнів B1, щоб одразу було видно сторінки в картці й підготовці.
+  const book = await db.textbook.findFirst({ orderBy: { createdAt: "asc" } });
+  if (book) {
+    const pages: [string, number][] = [["s2", 10], ["s7", 24], ["s10", 40]];
+    for (const [key, page] of pages) {
+      await db.student.update({ where: { id: studentId(key) }, data: { textbookId: book.id, textbookPage: page } });
+    }
+  }
+
+  // 9) Готовий план (у новому форматі) на найближчий урок Софії — щоб показати «📋 План уроку»
+  const sofiaNext = await db.lesson.findFirst({
+    where: { studentId: studentId("s2"), startAt: { gt: now }, status: "SCHEDULED" },
+    orderBy: { startAt: "asc" },
+  });
+  if (sofiaNext) {
+    await db.lesson.update({
+      where: { id: sofiaNext.id },
+      data: {
+        ...(book ? { textbookFrom: 10, textbookTo: 11 } : {}),
+        teacherNotes: [
+          "🎯 Мета: впевнено розрізняти Present continuous і Present simple в усній мові",
+          "",
+          "🔁 Повторити з минулого",
+          "• 5 слів про шкільний розклад: timetable, subject, break, term, mark",
+          "",
+          "⏱ Хід уроку (60 хв)",
+          "1) 0–5 хв · Розминка",
+          "• «What are you doing this week that you don't usually do?»",
+          "2) 5–20 хв · Пояснення на прикладах Софії",
+          "• «I usually study at home, but this week I'm studying at the library.»",
+          "3) 20–40 хв · Вправи з підручника",
+          "• стор. 11, вправи 5.1–5.3 — усно, Софія пояснює свій вибір",
+          "4) 40–55 хв · Говоріння",
+          "• розповідь про звичайний день і про цей тиждень (по 1 хв)",
+          "5) 55–60 хв · ДЗ і підсумок",
+          "",
+          "⚠️ На що звернути увагу",
+          "• соромиться говорити — спершу дати 30 с на підготовку",
+          "• хвалити за повні речення, помилки виправляти після відповіді",
+        ].join("\n"),
+        homework: "• стор. 11, вправа 5.4 письмово\n• записати голосове 1 хв: «My typical day vs this week»",
+      },
+    });
+  }
+
   return { students: STUDENTS.length, lessons: lessons.length, payments: payments.length };
 }
