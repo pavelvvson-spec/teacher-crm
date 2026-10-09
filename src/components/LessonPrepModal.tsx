@@ -21,6 +21,11 @@ export type PrepLesson = {
   previous?: PrepPrevious;
 };
 
+// Висота поля під текст: короткий — компактно, довгий план від ШІ — видно майже весь
+function autoRows(text: string, min: number, max: number) {
+  return Math.min(max, Math.max(min, text.split("\n").length + 1));
+}
+
 const MATERIAL_LABELS: Record<string, string> = {
   LINK: "Посилання",
   YOUTUBE: "YouTube",
@@ -257,8 +262,14 @@ export default function LessonPrepModal({
           <AiPrepButton
             lessonId={lesson.id}
             endpoint={isDraft ? `/api/students/${draftStudentId}/draft/ai-prep` : undefined}
-            onUsePlan={(text) => setNoteText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
-            onUseHomework={(text) => setHomeworkText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
+            currentPlan={noteText}
+            currentHomework={homeworkText}
+            onUsePlan={(text, mode) =>
+              setNoteText((prev) => (mode === "append" && prev.trim() ? `${prev}\n\n${text}` : text))
+            }
+            onUseHomework={(text, mode) =>
+              setHomeworkText((prev) => (mode === "append" && prev.trim() ? `${prev}\n\n${text}` : text))
+            }
           />
 
           <div className="space-y-1.5">
@@ -267,7 +278,7 @@ export default function LessonPrepModal({
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Наприклад: не забути перевірити знання слів, перевірити дз..."
-              rows={4}
+              rows={autoRows(noteText, 4, 18)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
             />
           </div>
@@ -290,7 +301,7 @@ export default function LessonPrepModal({
               value={homeworkText}
               onChange={(e) => setHomeworkText(e.target.value)}
               placeholder="Наприклад: вивчити 10 слів, зробити вправи 3-5 на стор. 12..."
-              rows={3}
+              rows={autoRows(homeworkText, 3, 10)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-300"
             />
           </div>
