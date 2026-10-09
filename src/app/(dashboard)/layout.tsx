@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import PullToRefresh from "@/components/PullToRefresh";
+import DemoBanner from "@/components/DemoBanner";
 
 const NAV_ITEMS = [
   { href: "/", label: "Головна" },
@@ -118,6 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen">
+      <DemoBanner />
       {/* Верхнє меню: тільки на комп'ютері */}
       <header className="hidden sm:block bg-white border-b border-gray-200">
         <nav className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-between">

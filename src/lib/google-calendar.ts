@@ -10,6 +10,7 @@
 // передбачуваний id (з id уроку), тому дублікатів не буде навіть при одночасних запусках.
 
 import { SignJWT, importPKCS8 } from "jose";
+import { isDemoRequest } from "@/lib/demo-mode";
 import { prisma } from "@/lib/prisma";
 
 const CAL_API = "https://www.googleapis.com/calendar/v3";
@@ -135,6 +136,8 @@ function eventBody(e: DesiredEvent) {
 export type ReconcileResult = { created: number; updated: number; deleted: number; skippedNoLink: number };
 
 export async function reconcileCalendar(): Promise<ReconcileResult> {
+  // У демо-режимі нічого не пишемо в справжній Google-календар
+  if (await isDemoRequest()) return { created: 0, updated: 0, deleted: 0, skippedNoLink: 0 };
   const calendarId = process.env.GOOGLE_CALENDAR_ID;
   if (!calendarId || !readServiceAccount()) {
     throw new Error("Google-календар не налаштовано");

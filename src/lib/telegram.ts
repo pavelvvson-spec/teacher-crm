@@ -1,9 +1,11 @@
+import { isDemoRequest } from "@/lib/demo-mode";
 const TELEGRAM_API = "https://api.telegram.org/bot";
 
 export async function sendTelegramMessage(
   chatId: string,
   text: string
 ): Promise<{ success: boolean; messageId?: number; error?: string }> {
+  if (await isDemoRequest()) return { success: false, error: "Демо-режим: повідомлення не надсилаються" };
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!token) {
@@ -44,6 +46,7 @@ export async function sendTelegramMessageWithButtons(
   text: string,
   buttonRows: TelegramInlineButton[][]
 ): Promise<{ success: boolean; messageId?: number; error?: string }> {
+  if (await isDemoRequest()) return { success: false, error: "Демо-режим: повідомлення не надсилаються" };
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!token) {
@@ -81,6 +84,7 @@ export async function sendTelegramMessageWithKeyboard(
   text: string,
   buttonLabels: string[]
 ): Promise<{ success: boolean; messageId?: number; error?: string }> {
+  if (await isDemoRequest()) return { success: false, error: "Демо-режим: повідомлення не надсилаються" };
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!token) {

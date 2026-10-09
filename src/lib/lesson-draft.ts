@@ -29,23 +29,23 @@ export async function moveDraftToLesson(studentId: string, lessonId: string): Pr
     return `${x}\n\n${y}`;
   };
 
-  await prisma.$transaction([
-    prisma.lesson.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.lesson.update({
       where: { id: lessonId },
       data: {
         teacherNotes: join(lesson.teacherNotes, student.draftNotes),
         homework: join(lesson.homework, student.draftHomework),
       },
-    }),
-    prisma.lessonMaterial.updateMany({
+    });
+    await tx.lessonMaterial.updateMany({
       where: { draftStudentId: studentId },
       data: { lessonId, draftStudentId: null },
-    }),
-    prisma.student.update({
+    });
+    await tx.student.update({
       where: { id: studentId },
       data: { draftNotes: null, draftHomework: null, draftUpdatedAt: null },
-    }),
-  ]);
+    });
+  });
   return true;
 }
 

@@ -5,6 +5,8 @@ import CalendarSyncButton from "@/components/CalendarSyncButton";
 import { isFirefliesConfigured } from "@/lib/fireflies";
 import MethodologyPanel from "@/components/MethodologyPanel";
 import BreakNotificationsPanel from "@/components/BreakNotificationsPanel";
+import DemoModeToggle from "@/components/DemoModeToggle";
+import { isDemoRequest, demoDbConfigured } from "@/lib/demo-mode";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,8 @@ export default async function SettingsPage({
   const settings = await prisma.settings.findFirst();
   const teacherConnected = Boolean(settings?.teacherTelegramChatId);
   const tickReady = Boolean(process.env.TICK_SECRET);
+  const demoReady = demoDbConfigured();
+  const demoOn = await isDemoRequest();
 
   const TABS: { key: Tab; label: string }[] = [
     { key: "method", label: "Методика" },
@@ -197,6 +201,9 @@ export default async function SettingsPage({
           </div>
         </div>
       )}
+
+      {/* Перемикач режиму показу — лише внизу вкладки «Підключення» і лише якщо демо-базу налаштовано */}
+      {tab === "connections" && demoReady && <DemoModeToggle active={demoOn} />}
     </div>
   );
 }

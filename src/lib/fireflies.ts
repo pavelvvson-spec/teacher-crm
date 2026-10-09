@@ -7,6 +7,7 @@
 // Ліміт Fireflies API на безкоштовному тарифі — 50 запитів на добу, тому запитів робимо мінімум.
 
 import { createHmac, timingSafeEqual } from "crypto";
+import { isDemoRequest } from "@/lib/demo-mode";
 import { prisma } from "@/lib/prisma";
 import { callClaude } from "@/lib/anthropic";
 import { methodContext, ageInfo } from "@/lib/pedagogy";
@@ -300,6 +301,8 @@ export type ProcessResult =
   | { status: "skipped"; reason: string };
 
 export async function processFirefliesMeeting(meetingId: string, notify = true): Promise<ProcessResult> {
+  // У демо-режимі справжні записи уроків не обробляємо (щоб вони не потрапили в демо-базу)
+  if (await isDemoRequest()) return { status: "skipped", reason: "демо-режим" };
   const exists = await prisma.studentJournalEntry.findUnique({ where: { externalId: meetingId } });
   if (exists) return { status: "skipped", reason: "вже в журналі" };
 
