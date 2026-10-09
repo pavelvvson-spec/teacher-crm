@@ -31,12 +31,58 @@ const SYSTEM_PROMPT = `Ти — досвідчений методист з ан�
 Будь конкретним: готові питання, речення, слова, а не загальні поради.
 Якщо дано сторінки підручника — будуй урок навколо них: які вправи робити (номер вправи і сторінка), що пропустити, що додати від себе під цього учня; ДЗ — бажано з цих сторінок або робочого зошита до них. Не вигадуй вправ, яких немає на сторінках, — пиши «додатково» для власних.
 
-Відповідай СТРОГО одним JSON-об'єктом без markdown і без тексту навколо:
-{
-  "plan": "план уроку для вчительки: мета уроку; що повторити з минулого; блоки з таймінгом; конкретні вправи з прикладами; на що звернути увагу з цим учнем",
-  "homework": "домашнє завдання для учня, коротко і зрозуміло, так щоб його можна було одразу надіслати учню в Telegram"
+ФОРМАТ ВІДПОВІДІ — простий текст (НЕ JSON, без markdown: жодних зірочок, решіток і лапок-коду), рівно два розділи з такими заголовками-маркерами:
+
+===ПЛАН===
+🎯 Мета: одне коротке речення
+
+🔁 Повторити з минулого
+• 1–3 пункти
+
+⏱ Хід уроку (тривалість хв)
+1) 0–5 хв · Назва блоку
+• що робити, коротко
+• приклад: «What's this job?»
+2) 5–15 хв · Назва блоку
+• …
+
+📖 Підручник: стор. X–Y — вправи … (лише якщо дано сторінки підручника)
+
+⚠️ На що звернути увагу
+• 1–3 пункти саме про цього учня
+
+===ДЗ===
+Домашнє завдання для учня: 2–4 пункти через «• », коротко і зрозуміло, щоб одразу надіслати учню в Telegram.
+
+Правила оформлення: кожен пункт — один рядок (максимум два); між розділами — порожній рядок; англійські приклади в «»; без довгих пояснень і повторів; весь план — до 1800 символів.`;
+
+// Розбирає відповідь ШІ на план і ДЗ та прибирає «технічні» символи,
+// щоб текст читався так само гарно, як звіти в Telegram.
+export function cleanPrepText(t: string): string {
+  return t
+    .replace(/\\n/g, "\n") // буквальні \n → справжні переноси
+    .replace(/\\"/g, '"')
+    .replace(/\*\*(.+?)\*\*/g, "$1") // **жирний** → просто текст
+    .replace(/^#{1,6}\s*/gm, "") // заголовки markdown
+    .replace(/^\s*[-*]\s+/gm, "• ") // маркери списків → «• »
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
-Використовуй \\n для нових рядків усередині значень.`;
+
+export function splitPrep(text: string): { plan: string; homework: string } {
+  const pi = text.indexOf("===ПЛАН===");
+  const hi = text.indexOf("===ДЗ===");
+  if (pi !== -1 || hi !== -1) {
+    const plan = pi !== -1 ? text.slice(pi + 10, hi > pi ? hi : undefined) : text.slice(0, hi);
+    const homework = hi !== -1 ? text.slice(hi + 8) : "";
+    return { plan: cleanPrepText(plan), homework: cleanPrepText(homework) };
+  }
+  // Старий формат (JSON) — про всяк випадок
+  const m = /"plan"\s*:\s*"([\s\S]*?)"\s*,\s*"homework"\s*:\s*"([\s\S]*?)"\s*}?\s*$/.exec(text.trim());
+  if (m) return { plan: cleanPrepText(m[1]), homework: cleanPrepText(m[2]) };
+  return { plan: cleanPrepText(text), homework: "" };
+}
 
 export type LessonPrepResult =
   | {
@@ -120,25 +166,13 @@ ${wish || "немає"}`;
     ? [{ type: "text", text: `${userPrompt}\n\n${tb.text}` }, ...tb.blocks]
     : userPrompt;
 
-  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), content, 3000);
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), content, 5000);
   if (!result.ok) {
     return { ok: false, error: result.error };
   }
   const text = result.text;
 
-  let plan = text;
-  let homework = "";
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end > start) {
-    try {
-      const parsed = JSON.parse(text.slice(start, end + 1));
-      plan = String(parsed.plan ?? "");
-      homework = String(parsed.homework ?? "");
-    } catch {
-      // якщо JSON зламаний — показуємо весь текст як план
-    }
-  }
+  const { plan, homework } = splitPrep(text);
 
   return { ok: true, plan, homework, lessonId: lesson.id, lessonStartAt: lesson.startAt, studentId: lesson.studentId };
 }
@@ -212,21 +246,9 @@ ${wish || "немає"}`;
     ? [{ type: "text", text: `${userPrompt}\n\n${tb.text}` }, ...tb.blocks]
     : userPrompt;
 
-  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), content, 3000);
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), content, 5000);
   if (!result.ok) return { ok: false, error: result.error };
   const text = result.text;
-  let plan = text;
-  let homework = "";
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start !== -1 && end > start) {
-    try {
-      const parsed = JSON.parse(text.slice(start, end + 1));
-      plan = String(parsed.plan ?? "");
-      homework = String(parsed.homework ?? "");
-    } catch {
-      // якщо JSON зламаний — показуємо весь текст як план
-    }
-  }
+  const { plan, homework } = splitPrep(text);
   return { ok: true, plan, homework };
 }

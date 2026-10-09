@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatTime } from "@/lib/calendar-utils";
+import PlanText from "@/components/PlanText";
 
 type Material = { id: string; type: string; title: string; url: string };
 
@@ -85,7 +86,7 @@ export default function LessonPlanView({
           <section className="space-y-1.5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">План і нотатка</h3>
             {lesson.teacherNotes?.trim() ? (
-              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{lesson.teacherNotes}</p>
+              <PlanText text={lesson.teacherNotes} />
             ) : (
               <p className="text-sm text-gray-400">Не заповнено</p>
             )}
@@ -94,7 +95,7 @@ export default function LessonPlanView({
           <section className="space-y-1.5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Домашнє завдання</h3>
             {lesson.homework?.trim() ? (
-              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{lesson.homework}</p>
+              <PlanText text={lesson.homework} />
             ) : (
               <p className="text-sm text-gray-400">Не задано</p>
             )}

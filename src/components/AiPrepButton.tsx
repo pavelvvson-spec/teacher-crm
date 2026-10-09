@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PlanText from "@/components/PlanText";
 
 export default function AiPrepButton({
   lessonId,
@@ -74,8 +75,8 @@ export default function AiPrepButton({
           {plan && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">План уроку</p>
-              <div className="bg-indigo-50/50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap max-h-80 overflow-y-auto">
-                {plan}
+              <div className="bg-indigo-50/50 rounded-xl px-4 py-3 max-h-96 overflow-y-auto">
+                <PlanText text={plan} />
               </div>
               <button
                 type="button"
@@ -93,8 +94,8 @@ export default function AiPrepButton({
           {homework && (
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">Запропоноване ДЗ</p>
-              <div className="bg-purple-50/50 rounded-xl px-4 py-3 text-sm text-gray-800 whitespace-pre-wrap">
-                {homework}
+              <div className="bg-purple-50/50 rounded-xl px-4 py-3">
+                <PlanText text={homework} />
               </div>
               <button
                 type="button"
