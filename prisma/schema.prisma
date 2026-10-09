@@ -77,6 +77,12 @@ model Student {
 
   aiPortrait          String?
   aiPortraitAt        DateTime?
+
+  // Чернетка наступного уроку, коли дати ще немає (переїде в урок, щойно його створять)
+  draftNotes          String?
+  draftHomework       String?
+  draftUpdatedAt      DateTime?
+  draftMaterials      LessonMaterial[] @relation("DraftMaterials")
 }
 
 enum LessonStatus {
@@ -221,8 +227,11 @@ enum MaterialType {
 
 model LessonMaterial {
   id        String       @id @default(cuid())
-  lessonId  String
-  lesson    Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  // Матеріал належить або уроку, або чернетці наступного уроку учня
+  lessonId  String?
+  lesson    Lesson?      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  draftStudentId String?
+  draftStudent   Student? @relation("DraftMaterials", fields: [draftStudentId], references: [id], onDelete: Cascade)
   type      MaterialType
   title     String
   url       String

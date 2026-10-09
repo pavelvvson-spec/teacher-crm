@@ -131,3 +131,80 @@ ${wish || "немає"}`;
 
   return { ok: true, plan, homework, lessonId: lesson.id, lessonStartAt: lesson.startAt, studentId: lesson.studentId };
 }
+
+// План для чернетки наступного уроку (дати ще немає) — ті самі дані про учня, але без конкретного уроку
+export async function generateDraftPrep(
+  studentId: string,
+  wish: string
+): Promise<{ ok: true; plan: string; homework: string } | { ok: false; error: string }> {
+  const s = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: { journalEntries: true, draftMaterials: { select: { title: true } } },
+  });
+  if (!s) return { ok: false, error: "Учня не знайдено" };
+
+  const previous = await prisma.lesson.findMany({
+    where: { studentId, startAt: { lt: new Date() } },
+    orderBy: { startAt: "desc" },
+    take: 8,
+    include: { materials: { select: { title: true } } },
+  });
+  const historyText =
+    previous.length === 0
+      ? "Попередніх уроків у системі немає."
+      : previous
+          .reverse()
+          .map((l) => {
+            const parts = [`- ${kyivDate(l.startAt)} (${STATUS_UA[l.status] ?? l.status})`];
+            if (l.teacherNotes) parts.push(`  Нотатка вчительки: ${l.teacherNotes}`);
+            if (l.homework) parts.push(`  ДЗ: ${l.homework}`);
+            if (l.materials.length) parts.push(`  Матеріали: ${l.materials.map((m) => m.title).join("; ")}`);
+            return parts.join("\n");
+          })
+          .join("\n");
+
+  const userPrompt = `Підготуй НАСТУПНИЙ урок (дата ще не відома — урок після останнього проведеного).
+
+УЧЕНЬ
+Ім'я: ${s.firstName}
+Вік: ${ageInfo(s)}
+Рівень англійської: ${s.englishLevel}
+Формат: ${s.lessonFormat === "ONLINE" ? "онлайн" : "офлайн"}
+Тривалість уроку: ${s.defaultLessonDuration} хв
+Загальні нотатки про учня: ${s.notes || "немає"}
+
+ПОРТРЕТ УЧНЯ (підсумок ШІ з журналу${s.aiPortraitAt ? ", " + s.aiPortraitAt.toLocaleDateString("uk-UA", { timeZone: "Europe/Kyiv" }) : ""})
+${s.aiPortrait || "ще не складено"}
+
+ЖУРНАЛ ВЧИТЕЛЬКИ ПРО УЧНЯ (від старіших до новіших; найсвіжіше — найважливіше)
+${journalToText(s.journalEntries, 12000)}
+
+ЧЕРНЕТКА НАСТУПНОГО УРОКУ
+Нотатка, яку вже написала вчителька: ${s.draftNotes || "немає"}
+ДЗ, вже вписане: ${s.draftHomework || "немає"}
+Прикріплені матеріали: ${s.draftMaterials.map((m) => m.title).join("; ") || "немає"}
+
+ОСТАННІ УРОКИ (від старіших до новіших)
+${historyText}
+
+ПОБАЖАННЯ ВЧИТЕЛЬКИ
+${wish || "немає"}`;
+
+  const result = await callClaude(SYSTEM_PROMPT + (await methodContext()), userPrompt, 3000);
+  if (!result.ok) return { ok: false, error: result.error };
+  const text = result.text;
+  let plan = text;
+  let homework = "";
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1));
+      plan = String(parsed.plan ?? "");
+      homework = String(parsed.homework ?? "");
+    } catch {
+      // якщо JSON зламаний — показуємо весь текст як план
+    }
+  }
+  return { ok: true, plan, homework };
+}

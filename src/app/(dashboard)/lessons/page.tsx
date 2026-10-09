@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import LessonsPrepView from "@/components/LessonsPrepView";
+import StudentDraftBlock from "@/components/StudentDraftBlock";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,41 @@ export default async function LessonsPage() {
       : null;
   }
 
+  // Чернетки «Наступний урок · дата ще не відома»
+  const draftStudents = await prisma.student.findMany({
+    where: {
+      isActive: true,
+      OR: [{ draftNotes: { not: null } }, { draftHomework: { not: null } }, { draftMaterials: { some: {} } }],
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      draftNotes: true,
+      draftHomework: true,
+      _count: { select: { draftMaterials: true } },
+    },
+    orderBy: { firstName: "asc" },
+  });
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-800">Підготовка до уроку</h1>
+      {draftStudents.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Без дати</h2>
+          {draftStudents.map((d) => (
+            <StudentDraftBlock
+              key={d.id}
+              studentId={d.id}
+              studentName={`${d.firstName} ${d.lastName ?? ""}`.trim()}
+              showName
+              hasFutureLesson={false}
+              draft={{ teacherNotes: d.draftNotes, homework: d.draftHomework, materialsCount: d._count.draftMaterials }}
+            />
+          ))}
+        </section>
+      )}
       <LessonsPrepView
         lessons={lessons.map((l: typeof lessons[number]) => ({
           id: l.id,

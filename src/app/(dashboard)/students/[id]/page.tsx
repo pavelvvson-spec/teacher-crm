@@ -5,6 +5,8 @@ import StudentScheduleManager from "@/components/StudentScheduleManager";
 import StudentJournal from "@/components/StudentJournal";
 import StudentActionsMenu from "@/components/StudentActionsMenu";
 import { studentWord } from "@/lib/gender";
+import StudentDraftBlock from "@/components/StudentDraftBlock";
+import { draftHasContent } from "@/lib/lesson-draft";
 import { getStudentNumber } from "@/lib/student-number";
 
 export default async function StudentDetailPage({
@@ -15,7 +17,10 @@ export default async function StudentDetailPage({
   const { id } = await params;
   const student = await prisma.student.findUnique({
     where: { id },
-    include: { journalEntries: { orderBy: { createdAt: "desc" } } },
+    include: {
+      journalEntries: { orderBy: { createdAt: "desc" } },
+      _count: { select: { draftMaterials: true } },
+    },
   });
 
   if (!student) {
@@ -23,6 +28,17 @@ export default async function StudentDetailPage({
   }
 
   const studentNumber = await getStudentNumber(id);
+  const hasFutureLesson =
+    (await prisma.lesson.count({
+      where: { studentId: id, startAt: { gt: new Date() }, status: { in: ["SCHEDULED", "RESCHEDULED"] } },
+    })) > 0;
+  const draft = draftHasContent(student, student._count.draftMaterials)
+    ? {
+        teacherNotes: student.draftNotes,
+        homework: student.draftHomework,
+        materialsCount: student._count.draftMaterials,
+      }
+    : null;
 
   const formValues = {
     id: student.id,
@@ -66,6 +82,9 @@ export default async function StudentDetailPage({
       {/* На телефоні спершу журнал і графік (щоденне), потім анкета; на комп'ютері — дві колонки */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div className="space-y-4 lg:order-2">
+          {student.isActive && (
+            <StudentDraftBlock studentId={student.id} draft={draft} hasFutureLesson={hasFutureLesson} />
+          )}
           <StudentJournal
             studentId={student.id}
             initialEntries={student.journalEntries.map((e) => ({

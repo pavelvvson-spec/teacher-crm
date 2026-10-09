@@ -90,6 +90,10 @@ export default function LessonForm({
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || "Помилка створення уроку");
         }
+        const created = await res.json().catch(() => ({}));
+        if (created?.draftApplied) {
+          alert("✓ Підготовку з чернетки «Наступний урок» перенесено в цей урок");
+        }
       } else {
         if (selectedDays.length === 0) {
           setError("Оберіть хоча б один день тижня");

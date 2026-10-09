@@ -4,10 +4,12 @@ import { useState } from "react";
 
 export default function AiPrepButton({
   lessonId,
+  endpoint,
   onUsePlan,
   onUseHomework,
 }: {
   lessonId: string;
+  endpoint?: string; // інша адреса генерації (наприклад, для чернетки наступного уроку)
   onUsePlan: (text: string) => void;
   onUseHomework: (text: string) => void;
 }) {
@@ -23,7 +25,7 @@ export default function AiPrepButton({
     setLoading(true);
     setError("");
     setMessage("");
-    const res = await fetch(`/api/lessons/${lessonId}/ai-prep`, {
+    const res = await fetch(endpoint ?? `/api/lessons/${lessonId}/ai-prep`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ wish }),

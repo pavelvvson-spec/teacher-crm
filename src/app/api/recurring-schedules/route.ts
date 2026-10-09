@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { moveDraftToLesson, nextScheduledLesson } from "@/lib/lesson-draft";
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson } from "@/lib/lesson-conflict";
 import { syncStudentLessons } from "@/lib/recurring-schedule-sync";
@@ -74,6 +75,14 @@ export async function POST(request: NextRequest) {
   });
 
   const { lessonsCreated, lessonsCancelled } = await syncStudentLessons(body.studentId, activeFrom);
+
+  // З'явились уроки — чернетка наступного уроку переїжджає в найближчий з них
+  try {
+    const next = await nextScheduledLesson(body.studentId);
+    if (next) await moveDraftToLesson(body.studentId, next.id);
+  } catch (e) {
+    console.error("draft move error", e);
+  }
 
   await syncCalendarSafely();
   return NextResponse.json({ schedule, lessonsCreated, lessonsCancelled }, { status: 201 });

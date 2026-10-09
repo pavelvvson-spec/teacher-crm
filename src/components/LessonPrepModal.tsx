@@ -33,8 +33,11 @@ export default function LessonPrepModal({
   onClose,
   onSaved,
   onMaterialsChange,
+  draftStudentId,
 }: {
   lesson: PrepLesson;
+  // Якщо задано — це чернетка наступного уроку учня (дати ще немає)
+  draftStudentId?: string;
   onClose: () => void;
   onSaved: (fields: { teacherNotes: string | null; homework: string | null }) => void;
   onMaterialsChange?: (materials: PrepMaterial[]) => void;
@@ -56,11 +59,15 @@ export default function LessonPrepModal({
   const [previous, setPrevious] = useState<PrepPrevious | undefined>(lesson.previous);
 
   const isDirty = noteText !== savedNote || homeworkText !== savedHomework;
+  const isDraft = Boolean(draftStudentId);
+  const materialsUrl = isDraft
+    ? `/api/students/${draftStudentId}/draft/materials`
+    : `/api/lessons/${lesson.id}/materials`;
   const startAt = new Date(lesson.startAt);
 
   async function loadMaterials() {
     setMaterialsLoading(true);
-    const res = await fetch(`/api/lessons/${lesson.id}/materials`).catch(() => null);
+    const res = await fetch(materialsUrl).catch(() => null);
     const data: PrepMaterial[] = res && res.ok ? await res.json() : [];
     setMaterials(data);
     setMaterialsLoading(false);
@@ -69,7 +76,7 @@ export default function LessonPrepModal({
 
   useEffect(() => {
     loadMaterials();
-    if (lesson.previous === undefined) {
+    if (lesson.previous === undefined && !isDraft) {
       fetch(`/api/lessons/${lesson.id}/previous`)
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => setPrevious(d ?? null))
@@ -96,7 +103,7 @@ export default function LessonPrepModal({
 
   async function saveAll(close: boolean) {
     setSaving(true);
-    const res = await fetch(`/api/lessons/${lesson.id}`, {
+    const res = await fetch(isDraft ? `/api/students/${draftStudentId}/draft` : `/api/lessons/${lesson.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ teacherNotes: noteText, homework: homeworkText }),
@@ -143,7 +150,7 @@ export default function LessonPrepModal({
 
   async function addLinkMaterial() {
     if (!newLinkTitle || !newLinkUrl) return;
-    await fetch(`/api/lessons/${lesson.id}/materials`, {
+    await fetch(materialsUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title: newLinkTitle, url: newLinkUrl }),
@@ -158,7 +165,7 @@ export default function LessonPrepModal({
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", file.name);
-    const res = await fetch(`/api/lessons/${lesson.id}/materials`, { method: "POST", body: formData });
+    const res = await fetch(materialsUrl, { method: "POST", body: formData });
     setUploading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -170,7 +177,7 @@ export default function LessonPrepModal({
 
   async function deleteMaterial(materialId: string) {
     if (!confirm("Видалити цей матеріал?")) return;
-    await fetch(`/api/lessons/${lesson.id}/materials`, {
+    await fetch(materialsUrl, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ materialId }),
@@ -193,10 +200,14 @@ export default function LessonPrepModal({
             <h2 className="text-lg font-semibold text-gray-800 truncate">
               {lesson.student.firstName} {lesson.student.lastName ?? ""}
             </h2>
-            <p className="text-gray-500 text-sm">
-              {startAt.toLocaleDateString("uk-UA", { weekday: "long", day: "numeric", month: "long" })} ·{" "}
-              {formatTime(startAt)} · {lesson.duration} хв
-            </p>
+            {isDraft ? (
+              <p className="text-sm text-amber-700">📝 Наступний урок · дата ще не відома</p>
+            ) : (
+              <p className="text-gray-500 text-sm">
+                {startAt.toLocaleDateString("uk-UA", { weekday: "long", day: "numeric", month: "long" })} ·{" "}
+                {formatTime(startAt)} · {lesson.duration} хв
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -230,10 +241,17 @@ export default function LessonPrepModal({
             </div>
           )}
 
-          <CopyPrepButton lessonId={lesson.id} onCopied={handleCopied} />
+          {isDraft ? (
+            <p className="text-xs text-gray-500 bg-amber-50 rounded-lg px-3 py-2">
+              Щойно ви додасте наступний урок у календар, ця підготовка сама переїде в нього.
+            </p>
+          ) : (
+            <CopyPrepButton lessonId={lesson.id} onCopied={handleCopied} />
+          )}
 
           <AiPrepButton
             lessonId={lesson.id}
+            endpoint={isDraft ? `/api/students/${draftStudentId}/draft/ai-prep` : undefined}
             onUsePlan={(text) => setNoteText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
             onUseHomework={(text) => setHomeworkText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))}
           />
@@ -252,6 +270,7 @@ export default function LessonPrepModal({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium text-gray-700">Домашнє завдання</p>
+              {!isDraft && (
               <button
                 type="button"
                 onClick={sendHomeworkToTelegram}
@@ -260,6 +279,7 @@ export default function LessonPrepModal({
               >
                 {sendingHomework ? "Надсилання..." : "✈️ Надіслати учню в Telegram"}
               </button>
+              )}
             </div>
             <textarea
               value={homeworkText}

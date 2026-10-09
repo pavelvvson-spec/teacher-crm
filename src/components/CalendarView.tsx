@@ -19,6 +19,7 @@ import SyncAllSchedulesButton from "@/components/SyncAllSchedulesButton";
 import PaymentsMoreMenu from "@/components/PaymentsMoreMenu";
 import LessonPrepModal from "@/components/LessonPrepModal";
 import LessonPlanView from "@/components/LessonPlanView";
+import NextLessonPrepButton from "@/components/NextLessonPrepButton";
 import { byGender, noShowPaidNote } from "@/lib/gender";
 import SendLinkButton from "@/components/SendLinkButton";
 
@@ -66,6 +67,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
 
   const [showMaterials, setShowMaterials] = useState(false);
   const [showPlan, setShowPlan] = useState(false);
+  const [nextPrepOpen, setNextPrepOpen] = useState(false);
 
   const getRange = useCallback(() => {
     if (viewMode === "day") {
@@ -133,6 +135,7 @@ export default function CalendarView({ students }: { students: Student[] }) {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (showForm) setShowForm(false);
+      else if (nextPrepOpen) return; // вікно підготовки наступного уроку закривається само
       else if (showPlan) return; // вікно плану закривається само
       else if (showMaterials) return; // вікно підготовки закривається само (з перевіркою незбереженого)
       else closeLesson();
@@ -682,6 +685,15 @@ export default function CalendarView({ students }: { students: Student[] }) {
                 </button>
               )}
               <SendLinkButton key={selectedLesson.id} lessonId={selectedLesson.id} />
+              {(selectedLesson.status === "COMPLETED" || new Date(selectedLesson.endAt) < new Date()) && (
+                <div className="sm:col-span-2">
+                  <NextLessonPrepButton
+                    studentId={selectedLesson.studentId}
+                    onOpenChange={setNextPrepOpen}
+                    onChanged={() => loadLessons()}
+                  />
+                </div>
+              )}
             </div>
 
             {selectedLesson.meetingLink && (

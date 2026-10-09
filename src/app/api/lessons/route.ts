@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { findConflictingLesson, findExactDuplicateLesson } from "@/lib/lesson-conflict";
 import { syncCalendarSafely } from "@/lib/google-calendar";
+import { moveDraftToLesson, nextScheduledLesson } from "@/lib/lesson-draft";
 
 // Після змін синхронізуємо Google-календар (може зайняти кілька секунд)
 export const maxDuration = 60;
@@ -65,6 +66,15 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  // Якщо в учня є чернетка наступного уроку і це найближчий урок — переносимо підготовку в нього
+  let draftApplied = false;
+  try {
+    const next = await nextScheduledLesson(body.studentId);
+    if (next?.id === lesson.id) draftApplied = await moveDraftToLesson(body.studentId, lesson.id);
+  } catch (e) {
+    console.error("draft move error", e);
+  }
+
   await syncCalendarSafely();
-  return NextResponse.json(lesson, { status: 201 });
+  return NextResponse.json({ ...lesson, draftApplied }, { status: 201 });
 }
